@@ -1,0 +1,8 @@
+name: qc_global_utilities
+dependencies:
+  - python=3.10
+  - pydantic
+  - pip
+  - numpy
+  - pip:
+    - build
