@@ -38,8 +38,9 @@ class temporary_file_base(BaseModel):
         elif self.which==choice.src:
             return self.source
     def check(self):
-        assert os.path.isfile(self.source), f"Source file corrupted ({self.source} is not a file): quiting for safety"
-        assert os.path.realpath(self.source)!=os.path.realpath(self.tmp_file), f"error in this class tmp_file is source file, dangerous since source could be destroyed"
+        if self.tmp_file is not None:
+            assert os.path.isfile(self.source), f"Source file corrupted ({self.source} is not a file): quiting for safety"
+            assert os.path.realpath(self.source)!=os.path.realpath(self.tmp_file), f"error in this class tmp_file is source file, dangerous since source could be destroyed"
         return True
 
 class temporary_file(temporary_file_base):
@@ -85,6 +86,8 @@ class temporary_file(temporary_file_base):
         if os.path.realpath(tmp_file)==os.path.realpath(source):
             tmp_file=None
             which=choice.src
+        else:
+            which=choice.tmp
         # Assert the file lies in this directory and it exists
         if tmp_file is not None:
             assert os.path.relpath(os.path.dirname(os.path.realpath(tmp_file)),os.getcwd())=='.', f"Tmp_file should be dropped in this directory, tmp_file={tmp_file}"

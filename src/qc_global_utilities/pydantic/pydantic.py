@@ -19,12 +19,15 @@ def check_dir(string):
     assert os.path.isdir(string),f"Not a valid directory: {string}"
     return string
 def check_file(string):
-    if  os.path.isfile(string):
-        return string
-    elif os.path.islink(string):
-        return string
+    if isinstance(string, str):
+        if  os.path.isfile(string):
+            return string
+        elif os.path.islink(string):
+            return string
+        else:
+            raise ValueError(f"Not a valid file: {string}")
     else:
-        raise ValueError(f"Not a valid file: {string}")
+        raise ValueError(f"Not a string (so not even a file: {string}")
 directory=Annotated[str, BeforeValidator(check_dir)]
 file=Annotated[str, BeforeValidator(check_file)]
 
