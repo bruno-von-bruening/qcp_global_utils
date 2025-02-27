@@ -28,3 +28,7 @@ def check_file(string):
 directory=Annotated[str, BeforeValidator(check_dir)]
 file=Annotated[str, BeforeValidator(check_file)]
 
+def list_to_string(the_list):
+    return json.dumps(the_list)
+
+my_list=Annotated[ List[int|float|str|file], PlainSerializer(list_to_string) ]
