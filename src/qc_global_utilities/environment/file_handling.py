@@ -51,17 +51,20 @@ class temporary_file(temporary_file_base):
     Else:
         works with uncomprsessed copy of the file
     """
-    def __init__(self, fi):
+    def __init__(self, fi, copy=False):
         # In case its a symlink copy to local dir
         source=fi
-        tmp_file=None
-        info=self.handle_source(source)
+        info=self.handle_source(source,copy)
         super().__init__(**info)
 
-    def handle_source(self,source):
+    def handle_source(self,source, copy):
         # If its a link unlink first
         tmp_file=source
-        if os.path.islink(tmp_file):
+
+        # Copy file?
+        is_link=os.path.islink(tmp_file)
+        is_compressed=any([ tmp_file.upper().endswith(ext.upper()) for ext in ['.gz','.xz']])
+        if any([is_link, is_compressed, copy]):
             old_file=tmp_file
             tmp_file='tmp.'+os.path.basename(tmp_file)
             run_shell_command(f"cp {os.path.realpath(old_file)} {tmp_file}")
@@ -69,29 +72,45 @@ class temporary_file(temporary_file_base):
             which=choice.tmp            
 
         ## Unpack 
-        if tmp_file.endswith('.gz'):
-            fi_zipped=tmp_file
-            cmd=f"gunzip {fi_zipped}"
-            stdout, stderr = run_shell_command(cmd)
-            tmp_file=fi_zipped.replace('.gz','')
-            assert os.path.isfile(tmp_file), f"Not a file: {tmp_file}"
-        if tmp_file.endswith('.xz'):
-            fi_zipped=tmp_file
-            cmd=f"xz -d {fi_zipped}"
-            stdout, stderr= run_shell_command(cmd)
-            tmp_file=fi_zipped.replace('.xz','')
-            assert os.path.isfile(tmp_file), f"Not a file: {tmp_file}"
+        def decompress(tmp_file):
+            extensions=['gz','xz']
+            scripts={ #executbale for the given extension
+                'gz':'gzip',
+                'xz':'xz',
+            }
+            def get_ext(tmp_file):
+                found=[ x for x in extensions if tmp_file.endswith('.'+x)]
+                assert len(found)==1, f"Cannot find extension (options={extensions}) for file: {tmp_file}"
+                return found[0]
+            ext=get_ext(tmp_file)
+
+            uncomp_file=tmp_file.replace(f".{ext}",'')
+            exec=scripts[ext]
+            cmd=f"{exec} -d {tmp_file}"
+            run_shell_command(cmd)
+            assert os.path.isfile(uncomp_file), f"Cannot find the file that should result from the \'{ext}\'-decompression ({cmd}): {uncomp_file}"
+            return uncomp_file
+        if is_compressed:
+            tmp_file=decompress(tmp_file)
+            
 
         # If the tmp file is the same as source, then there is no tmp_file
         if os.path.realpath(tmp_file)==os.path.realpath(source):
-            tmp_file=None
-            which=choice.src
+            if copy:
+                tmp_file='tmp.'+os.path.basename(source)
+                run_shell_command(f"cp {source} {tmp_file}")
+                assert os.path.isfile(tmp_file)
+                which=choice.tmp
+            else:
+                tmp_file=None
+                which=choice.src
         else:
             which=choice.tmp
         # Assert the file lies in this directory and it exists
+        def check_same_dir(tmp_file):
+            return os.path.relpath(os.path.dirname(os.path.realpath(tmp_file)),os.getcwd())=='.'
         if tmp_file is not None:
-            assert os.path.relpath(os.path.dirname(os.path.realpath(tmp_file)),os.getcwd())=='.', f"Tmp_file should be dropped in this directory, tmp_file={tmp_file}"
-            assert os.path.isfile(tmp_file)
+            if not check_same_dir(tmp_file): raise Exception(f"Tmp file should be in present working directory ({os.getcwd()})\n{tmp_file}")
 
         return dict(
             source=source,
