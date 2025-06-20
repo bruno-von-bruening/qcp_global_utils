@@ -1,5 +1,5 @@
 [project]
-name = "qc_global_utilities"
+name = "qcp_global_utils"
 version = "0.1.0"
 description = ''
 readme = "README.md"
