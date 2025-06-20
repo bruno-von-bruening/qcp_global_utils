@@ -1,6 +1,6 @@
 from . import *
 
-from qc_global_utilities.shell_processes.execution import run_shell_command
+from qcp_global_utils.shell_processes.execution import run_shell_command
 
 @validate_call
 def link_file(source:file, target:str|None=None, remove_old=True) -> file:
@@ -30,6 +30,8 @@ class temporary_file_base(BaseModel):
     source: file
     tmp_file: file | None
     which:  choice = choice.tmp
+    overwrite: bool=False
+
     @property
     def file(self):
         if self.which==choice.tmp:
@@ -51,13 +53,13 @@ class temporary_file(temporary_file_base):
     Else:
         works with uncomprsessed copy of the file
     """
-    def __init__(self, fi, copy=False):
+    def __init__(self, fi, copy=False, overwrite=False):
         # In case its a symlink copy to local dir
         source=fi
-        info=self.handle_source(source,copy)
-        super().__init__(**info)
+        info=self.handle_source(source,copy, overwrite=overwrite)
+        super().__init__(**info, overwrite=overwrite)
 
-    def handle_source(self,source, copy):
+    def handle_source(self,source, copy, overwrite=False):
         # If its a link unlink first
         tmp_file=source
 
@@ -85,6 +87,11 @@ class temporary_file(temporary_file_base):
             ext=get_ext(tmp_file)
 
             uncomp_file=tmp_file.replace(f".{ext}",'')
+            if os.path.isfile(uncomp_file) and not overwrite:
+                raise Exception(f"File {uncomp_file} allready exists and overwrite is deativated. Provide overwrite key to {temporary_file} to overwrite.")
+            else:
+                run_shell_command(f"rm {uncomp_file}")
+                
             exec=scripts[ext]
             cmd=f"{exec} -d {tmp_file}"
             run_shell_command(cmd)
@@ -100,12 +107,12 @@ class temporary_file(temporary_file_base):
                 tmp_file='tmp.'+os.path.basename(source)
                 run_shell_command(f"cp {source} {tmp_file}")
                 assert os.path.isfile(tmp_file)
-                which=choice.tmp
+                the_which=choice.tmp
             else:
                 tmp_file=None
-                which=choice.src
+                the_which=choice.src
         else:
-            which=choice.tmp
+            the_which=choice.tmp
         # Assert the file lies in this directory and it exists
         def check_same_dir(tmp_file):
             return os.path.relpath(os.path.dirname(os.path.realpath(tmp_file)),os.getcwd())=='.'
@@ -115,7 +122,7 @@ class temporary_file(temporary_file_base):
         return dict(
             source=source,
             tmp_file=tmp_file,
-            which=which
+            which=the_which
         )
 
     def remove_tmp(self, verbose=True):
@@ -124,3 +131,41 @@ class temporary_file(temporary_file_base):
             cmd=f"rm {self.tmp_file}"
             run_shell_command(cmd)
             if verbose: print(f"Deleted temporary file {self.tmp_file}")
+    def remove_src(self, verbose=True):
+        self.check()
+        cmd=f"rm {self.source}"
+        run_shell_command(cmd)
+        if verbose: print(f"Deleted source file {self.tmp_file}")
+    @val_call
+    def delete_all(self, tag=Literal['tmp','temporary','source','src','all'] , verbose=True):
+        if tag in ['tmp','temporary']:
+            self.remove_tmp(verbose=verbose)
+        elif tag in ['src','source']:
+            self.remove_src(verbose=verbose)
+        elif tag in ['all']:
+            self.remove_src(verbose=verbose)
+            self.remove_tmp(verbose=verbose)
+
+@val_call
+def load_json_or_yaml(the_file:file) -> Tuple[dict, list]:
+    """ """ 
+    def read_the_file(the_file):
+        # Read the file
+        with open(the_file, 'r') as rd:
+            content=rd.read()
+        
+        # Process the content to object
+        if the_file.upper().endswith( '.JSON' ):
+            content=json.loads(content)
+        elif the_file.upper().endswith( '.YAML' ):
+            content=yaml.save_load(content)
+        else:
+            raise Exception(f"Unkown ending of file (\'{the_file}\')")
+        return content
+    
+    try:
+        content=read_the_file(the_file)
+    except Exception as ex:
+        raise Exception(f"Could not process file (\'{the_file}\') as yaml or json file:\n error={ex}")
+
+    return content

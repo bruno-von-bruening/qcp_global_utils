@@ -1,4 +1,5 @@
 from . import *
+from .colors import col_di
 
 PERIODIC_TABLE_STR = """
 H                                                                                                                           He
@@ -15,12 +16,22 @@ def nuclear_charge_to_element_symbol(Z: int =Field(ge=1)):
     """ Return atom type when given an atomic Number """
     atom_types=PERIODIC_TABLE_STR.split()
     Z_to_atty_di=dict([ (i+1, at_ty) for i, at_ty in enumerate(atom_types)])
-    assert Z in Z_to_atty_di.keys()
+    assert Z in Z_to_atty_di.keys(), f"Atom Charge \'{Z}\' cannot be associated to an known Element"
     return Z_to_atty_di[Z]
 @validate_call
 def element_symbol_to_nuclear_charge(at_ty: str):
     """ Return atom type when given an atomic Number """
     atom_types=PERIODIC_TABLE_STR.split()
     atty_to_Z_di=dict([ (at_ty,i+1) for i, at_ty in enumerate(atom_types)])
-    assert at_ty in atty_to_Z_di.keys()
+    assert at_ty in atty_to_Z_di.keys(), f"Atom type \'{at_ty}\' cannot be associated to a nuclear charge!"
     return atty_to_Z_di[at_ty]
+
+def get_color(atom_type: int|str) -> Tuple[float, float, float]:
+    if isinstance(atom_type, int): atom_type=nuclear_charge_to_element_symbol(atom_type)
+
+    if not atom_type in col_di.keys():
+        default_color=col_di['default']
+        logging.warn(f"Do not know color for {atom_type}: ressorting to default: {default_color}")
+        return default_color
+    else:
+        return col_di[atom_type]

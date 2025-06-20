@@ -1,5 +1,5 @@
-conda_env='qc_global_utilities'
-conda_file="install/${conda_env}_conda_env.yaml"
+conda_env='qcp_global_utils'
+conda_file="install/${conda_env}_env.yaml"
 dependencies=()
 
 if [ ! -f ${conda_file} ]; then
