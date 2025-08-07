@@ -1,4 +1,5 @@
 from . import *
+import multiprocessing as mp
 
 
 class job(BaseModel):
@@ -8,6 +9,29 @@ class job(BaseModel):
 class job(job):
     def run(self):
         return self.function( *self.args, **self.kwargs)
+
+@val_cal
+def spawn_workers(jobs:List[job], num_processes:int):
+    """ Provide the job_list and this will be run in parallel """
+
+    pool=mp.Pool(processes=num_processes)
+
+    assert len(jobs)<=num_processes, f"More jobs than processes, batching system not implemented yet (think also about using queueing system)"
+    Runs=[]
+    for job in jobs:
+        run=pool.apply_async(job.function, [job.args, *job.kwargs ])
+        Runs.append(run)
+                
+    finished_jobs=[]
+    for run in Runs:
+        out=run.get()
+        finished_jobs+=[out]
+    return finished_jobs
+
+
+from . import *
+
+
 
 
 @val_cal
@@ -77,22 +101,6 @@ def make_queue(jobs:List[job], number_of_workers:int=Field(default=1, ge=1)) -> 
 
 
 
-def spawn_workers(jobs:List[job], num_processes:int):
-    """ Provide the job_list and this will be run in parallel """
-
-    pool=mp.Pool(processes=num_processes)
-
-    assert len(jobs)<=num_processes, f"More jobs than processes, batching system not implemented yet (think also about using queueing system)"
-    Runs=[]
-    for job in jobs:
-        run=pool.apply_async(job.function, [job.args, *job.kwargs ])
-        Runs.append(run)
-                
-    finished_jobs=[]
-    for run in Runs:
-        out=run.get()
-        finished_jobs+=[out]
-    return finished_jobs
 
 
 

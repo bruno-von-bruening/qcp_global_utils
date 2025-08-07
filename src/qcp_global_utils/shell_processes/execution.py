@@ -4,12 +4,36 @@ from ..pydantic.pydantic import file, directory
 @validate_call
 def run_shell_command(
     cmd:str, 
+    positional_args: list=[],
+    keyword_args: dict={},
     stdout_file: str|None='shell_output.out' , stderr_file: str|None='shell_output.err', 
     uncritical:bool=False, time_limit: float|None=None
 ) -> Tuple[str, str]:
     """
         time_limit: time in seconds after which to abort execution automatically (not implemented yer)
     """
+    def decorate_command(cmd, positional_args:list=[], keyword_args:dict={}):
+        """ 
+        append positional and keyword arguments to the command string
+        if value of dictionary is true then just give the key without an argument
+        """
+        args_line=[]
+
+        for arg in positional_args:
+            args_line+=[ f"{arg}"]
+
+        for k,v in keyword_args.items():
+            if isinstance(v, bool):
+                if v:
+                    args_line+=[ f"--{k}"] 
+            else:
+                args_line+=[ f"--{k} {v}" ]
+        
+        cmd=cmd if len(args_line)==0 else cmd+' '+' '.join(args_line) 
+        return cmd
+
+    cmd=decorate_command(cmd, positional_args, keyword_args)
+
 
     com=f"There are already redirections (\'>\') in your command, provide them with designated keywords"
     if not stdout_file is None or stderr_file is not None:

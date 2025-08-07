@@ -1,0 +1,2 @@
+conda_env_file: qcp_global_utils_env.yaml
+dependencies: [] # No dependencies
