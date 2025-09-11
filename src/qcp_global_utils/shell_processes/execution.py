@@ -7,6 +7,7 @@ def run_shell_command(
     positional_args: list=[],
     keyword_args: dict={},
     stdout_file: str|None='shell_output.out' , stderr_file: str|None='shell_output.err', 
+    display_command: bool=False,
     uncritical:bool=False, time_limit: float|None=None
 ) -> Tuple[str, str]:
     """
@@ -51,6 +52,8 @@ def run_shell_command(
         return content
         
     # Execute
+    if display_command:
+        print(f"# WILL RUN:\n    {cmd}")
     p=sp.Popen(cmd, shell=True, stderr=sp.PIPE, stdout=sp.PIPE)
     if time_limit is None:
         stdout, stderr = [x.decode('utf-8') for x in p.communicate() ]
@@ -60,6 +63,7 @@ def run_shell_command(
             stderr=get_out(stderr, stderr_file)
     else:
         raise Exception(f"Time limit not implemented yet")
+
 
     # Process the return
     if p.returncode!=0:

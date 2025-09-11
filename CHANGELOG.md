@@ -17,3 +17,6 @@ Created new utils directory in package. At the moment just used to standardise r
 ```import_helper.py``` content.
 
 Copied get_nshell function form encoding_and_conversion.encoding (previously in my old modules path)
+
+# v0.1.03 Minor Modifications to controller_model
+Mainly add convenience functionality to controller_model

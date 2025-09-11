@@ -158,7 +158,7 @@ def load_json_or_yaml(the_file:file) -> Tuple[dict, list]:
         if the_file.upper().endswith( '.JSON' ):
             content=json.loads(content)
         elif the_file.upper().endswith( '.YAML' ):
-            content=yaml.save_load(content)
+            content=yaml.safe_load(content)
         else:
             raise Exception(f"Unkown ending of file (\'{the_file}\')")
         return content
@@ -169,3 +169,25 @@ def load_json_or_yaml(the_file:file) -> Tuple[dict, list]:
         raise Exception(f"Could not process file (\'{the_file}\') as yaml or json file:\n error={ex}")
 
     return content
+
+@val_call
+def dump_content_to_file(content, output_file:str) -> file:
+    """ Give an object to drop and the name of the outputfile
+    The outputfile needs to have a recognized extension (at the moment yaml or json) to dump it automatically"""
+    def extension_match(ext):
+        return output_file.lower().endswith( '.'+ext.lstrip('.'))
+    def dump_yaml(content, wr):
+        yaml.safe_dump(content, wr)
+    def dump_json(content, wr):
+        json.dump(content, wr)
+
+    def func_map():
+        if extension_match('yaml'): func=dump_yaml
+        elif extension_match('json'): func=dump_json
+        else: raise Exception(f"No default dumping procedure implemented for this extension: {output_file}")
+        return func
+
+    func=func_map()
+    with open(output_file, 'w') as wr:
+        func(content, wr)
+    return output_file

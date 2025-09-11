@@ -1,4 +1,26 @@
-from qcp_global_utils.util.import_helper import * 
+from . import *
+import copy
+# from .parser_helper import check_is_controller
+
+def get_environment_var(string:str, expected_type:Literal['file']|None=None):
+    
+    if string.startswith('$'):
+        assert len(string)>0, f"string is only dollar sign: {string}"
+        string=string[1:]
+    else:
+        assert len(string)>0, f"Provided empty string"
+
+    assert string in os.environ.keys(), f"Provided environment variable {string} but cannot be found"
+    the_return=os.environ[string]
+    assert len(the_return)>1, f"Could process '${string}' as environment variable, but this variable is empty!"
+
+    if expected_type is None: pass 
+    elif expected_type=='file':
+        assert os.path.isfile(the_return), f"Could process string '${string}' as enviroment variable, but value is not a file: {the_return}"
+    else: raise Exception
+
+    return the_return 
+
 
 def check_is_controller(the_type):
     is_controller=False
@@ -14,69 +36,150 @@ def check_is_controller(the_type):
         is_controller=True
     return is_controller, the_type
 
-class controller_model(BaseModel):
-    class Config:
-        arbitrary_types_allowed=True
-        extra='forbid'
-    __example_values__={}
-    __default_values__={}
-
-    def read_input_file(self, input):
-        assert os.path.isfile(input), f"Not a file {input}"
-        implemented_formats=['.yaml','.json']
-        the_extension=[ x.strip('.') for x in implemented_formats if input.lower().endswith(x)]
-        if len(the_extension)<1: f"Could not understand extension. Formats implemented: {implemented_formats}"
-        assert len(the_extension)==1
-        the_extension=the_extension[0]
-
-        if the_extension=='yaml':
-            with open(input, 'r') as rd:
-                content=yaml.safe_load(rd)
-        elif the_extension=='json':
-            with open(input, 'r') as rd:
-                content=json.load(rd)
-        else: raise Exception(f"Unkown extension {the_extension}")
-        return content
-    
-    def process_input(self, *args,**kwargs):
-        """Input may by a positional argument or in kwargs
-        I need to call this function in the inherited class itself
-        """
-
+def process_input(*args,**kwargs):
+    """Input may by a positional argument or in kwargs
+    I need to call this function in the inherited class itself
+    """
+    @val_call
+    def get_input(args:list, kwargs:dict) -> Tuple[str|None,dict]:
         input=None
         # Check positionals
         if len(args)==1:
             input=args[0]
         elif len(args)>1: raise Exception(f"Expect maximum one positional argument")
 
-        # Check keywords
+        # Check keywords 
+        # -> confirm no double positional and keyword definition
         input_key='input'
         if input_key in kwargs.keys():
             assert input is None
             input=kwargs[input_key]
             del kwargs[input_key]
-        
+        return input, kwargs
+    @val_call
+    def process_input(input:pdtc_file|str|None, kwargs:dict):
+        """ 
+        If input is None: do nothing, 
+        if string with dollarsign:  then check for file under environment variable, 
+        if file: read the file
+        """
         if input is None:
             pass
         elif isinstance(input, str):
-            content=self.read_input_file(input)
+            # Should be either environment variable that points to file or 
+            if input.startswith('$'):
+                input=get_environment_var(input, expected_type='file')
+            else:
+                assert os.path.isfile(input), f"Input is not a file: {input}"
             
-            assert isinstance(content, dict)
+            # Read the file
+            content=load_json_or_yaml(input)
+            assert isinstance(content, dict), f"Expected to get find a dictionary but got {type(input)} from file: {input}"
 
+            # Assert that loaded content does not overlap with already provided kwargs!
+            # I guess we could also be lenient and allow kwargs to overwrite file
             for k,v in content.items():
                 assert k not in kwargs.keys(), f"Double definition of key {k} (from file {input})"
             kwargs.update(content)
+        else: raise Exception(f'Unexpected argument for \'{input_key}\': {input}, {type(input)}')
 
-        else:
-            raise Exception(f'Unexpected argument for \'{input_key}\': {input}, {type(input)}')
-        args=[]
-        return args, kwargs
+        return kwargs
+
+    input,kwargs=get_input(args, kwargs)
+    args=[]
+    kwargs=process_input(input, kwargs)
+
+    return args, kwargs
+
+class controller_model(BaseModel):
+    class Config:
+        arbitrary_types_allowed=True
+        use_enum_values=True
+        extra='forbid'
+    directory: str|None =Field(default=None, exclude=True)
+    filename: str|None =Field(default=None, exclude=True)# To remember file location to make relative paths work correctly
+    __example_values__={}
+    __default_values__={}
+
+    #def read_input_file(self, input:pdtc_dump_file):
+    #    content=load_json_or_yaml(input)
+    #    return content
+
+    @property
+    def file_path(self):
+        default_name=type(self).__name__+'.yaml'
+        filename=self.filename if self.filename is not None else default_name
+        return os.path.join(self.directory, filename )
+    
     def __init__(self, *args,**kwargs):
-        args,kwargs=self.process_input(*args,**kwargs)
+        
+        # Save location of file
+        filename, directory=None,None
+        if 'input' in kwargs.keys(): 
+            filename=os.path.basename(kwargs['input'])
+            directory=os.path.dirname(os.path.realpath(kwargs['input']))
+        else: 
+            # Could be inherited from upper class (if read as file)
+            dir_hid='directory'; fi_hid='filename'
+            if dir_hid in kwargs.keys():
+                directory=kwargs[dir_hid]; del kwargs[dir_hid]
+            else:
+                directory=os.getcwd()
+            if fi_hid in kwargs.keys():
+                filename=kwargs[fi_hid]; del kwargs[fi_hid]
+
+        # Args are made to kwargs (assuming that only on args exist and its the input)
+        args,kwargs=process_input(*args,**kwargs)
+        save_kwargs=copy.deepcopy(kwargs)
+
+
+        for key, value in self.__fields__.items():
+            the_type=value.annotation
+            is_controler, the_type = check_is_controller(the_type)
+
+            if key in kwargs.keys():
+                if is_controler:
+                    val=kwargs[key]
+                    if isinstance(val, str):
+                        # If relative path define to current file
+                        kwargs.update({key: copy.deepcopy(the_type(self.get_file_path(val, directory=directory)).model_dump())})
+                    kwargs[key].update({'filename':filename, 'directory':directory})
+                else:
+                    pass
+
         super().__init__(**kwargs)
+        self.filename=filename
+        self.directory=directory
+    def get_file_path(self, fi, directory=None):
+        
+        if directory is None: directory=self.directory
+
+        if fi.startswith('/'):
+            return fi
+        elif fi.startswith("$"):
+            import sys
+            assert len(fi)>1
+            key=fi[1:]
+            if not key in os.environ.keys(): raise Exception(f"Could not find environment variable \'{fi}\'")
+            else: return os.environ[key]
+        else:
+            if directory is None:
+                return fi
+            else:
+                assert os.path.isdir(directory)
+                realpath=os.path.realpath( os.path.join(directory, fi) )
+                assert os.path.isfile(realpath)
+                return realpath
+    def write(self, output_file: str| None =None) -> file:
+        content=self.model_dump()
+        if output_file is None:
+            output_file=type(self).__name__+'_example.yaml'
+        with open(output_file, 'w') as wr:
+            yaml.safe_dump(content, wr)
+        return output_file
+    #    """ Provides an example of this class. This function was conceived to print out example file that the user can then manipulate. """
     #@classmethod
     #def example(cls) -> dict:
-    #    """ Provides an example of this class. This function was conceived to print out example file that the user can then manipulate. """
     #    # Could also just iterate over all method attributed and add a <fill-in> as value
     #    # -> elaborate on that later
 
@@ -118,38 +221,6 @@ class controller_model(BaseModel):
     #    #super().__init__(**cls._example_values)
     #    return example_kwargs 
     __example_values__={}
-    def __init__(self, *args,**kwargs):
-        input_key='input'
-        if input_key in kwargs.keys():
-            input=kwargs[input_key]
-            del kwargs[input_key]
-            if input is None:
-                pass
-            elif isinstance(input, str):
-                assert os.path.isfile(input), f"Not a file {input}"
-                implemented_formats=['.yaml','.json']
-                the_extension=[ x.strip('.') for x in implemented_formats if input.lower().endswith(x)]
-                if len(the_extension)<1: f"Could not understand extension. Formats implemented: {implemented_formats}"
-                assert len(the_extension)==1
-                the_extension=the_extension[0]
-
-                if the_extension=='yaml':
-                    with open(input, 'r') as rd:
-                        content=yaml.safe_load(rd)
-                elif the_extension=='json':
-                    with open(input, 'r') as rd:
-                        content=json.load(rd)
-                else: raise Exception(f"Unkown extension {the_extension}")
-                
-                assert isinstance(content, dict)
-
-                for k,v in content.items():
-                    assert k not in kwargs.keys(), f"Double definition of key {k} (from file {input})"
-                kwargs.update(content)
-
-            else:
-                raise Exception(f'Unexpected argument for \'{input_key}\': {input}, {type(input)}')
-        super().__init__(**kwargs)
     @classmethod
     def example(cls, **kwargs) -> dict:
         """ Provides an example of this class. This function was conceived to print out example file that the user can then manipulate. """
@@ -171,6 +242,9 @@ class controller_model(BaseModel):
         # Make a dictionary of this class
         new_kwargs={}
         for key, value in cls.__fields__.items():
+            if value.exclude:
+                continue
+
             the_type=value.annotation
             is_required=value.is_required()
 
@@ -205,30 +279,44 @@ class controller_model(BaseModel):
         #super().__init__(**cls._example_values)
         return example_kwargs 
     @classmethod
-    def default_kwargs(cls) ->dict:
+    def default_kwargs(cls, **kwargs) ->dict:
 
         base_kwargs=cls.example()
         defaults=cls.__default_values__
 
-        for key, value in cls.__fields__.items():
+        fields=cls.__fields__
+
+        # CHECK
+        undefined=[ k for k in kwargs.keys() if k not in fields.keys() ]
+        assert len(undefined)<1, f"Could not recognize keys {undefined}"
+
+        # 
+        for key, value in fields.items():
+
+            # Some basic information
             the_type=value.annotation
             is_required=value.is_required()
-
             is_controller, the_type=check_is_controller(the_type)
 
-            if not is_controller:
-                if key in defaults:
-                    base_kwargs.update({key:defaults[key]})
+            provided= (key in kwargs.keys())
+
+            if is_controller:
+                value=the_type.default_kwargs()
+                if provided: value.update(kwargs[key])
+                base_kwargs.update({key:value})
             else:
-                base_kwargs.update({key:the_type.default_kwargs()})
-                
+                if not provided:
+                    if key in defaults:
+                        base_kwargs.update({key:defaults[key]})
+                else:
+                    base_kwargs.update({key:kwargs[key]})
         return base_kwargs
     @classmethod
-    def default(cls):
-        kwargs=cls.default_kwargs()
+    def default(cls, **kwargs):
+        kwargs=cls.default_kwargs(**kwargs)
         try:
             return cls(**kwargs)
-        except Exception as ex: raise Exception()
+        except Exception as ex: raise Exception(f"Problem in initializing default of class {cls.__name__}: {ex}")
 
 
     @classmethod
@@ -236,13 +324,6 @@ class controller_model(BaseModel):
         content=cls.example()
         if output_file is None:
             output_file=cls.__name__+'_example.yaml'
-        with open(output_file, 'w') as wr:
-            yaml.safe_dump(content, wr)
-        return output_file
-    def write(self,output_file: str| None =None) -> file:
-        content=self.model_dump()
-        if output_file is None:
-            output_file=type(self).__name__+'_example.yaml'
         with open(output_file, 'w') as wr:
             yaml.safe_dump(content, wr)
         return output_file

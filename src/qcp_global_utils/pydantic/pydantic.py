@@ -1,4 +1,6 @@
 from . import *
+from pydantic import BeforeValidator, PlainSerializer
+from typing import Annotated
 
 import numpy as np
 
@@ -28,8 +30,17 @@ def check_file(string):
             raise ValueError(f"Not a valid file: {string}")
     else:
         raise ValueError(f"Not a string (so not even a file: {string}")
+def check_dump_file(string):
+    check_file(string)
+    dump_extensions=['yaml','json']
+    if not any([ string.lower().endswith('.'+x) for x in dump_extensions]):
+        raise ValueError(f"Expected dump_file to end with one of  {dump_extensions}, got {string}")
+    return string
 directory=Annotated[str, BeforeValidator(check_dir)]
 file=Annotated[str, BeforeValidator(check_file)]
+pdtc_file=Annotated[str, BeforeValidator(check_file)]
+pdtc_dump_file=Annotated[str, BeforeValidator(check_dump_file)]
+pdtc_directory=Annotated[str, BeforeValidator(check_dir)]
 
 def list_to_string(the_list):
     return json.dumps(the_list)
