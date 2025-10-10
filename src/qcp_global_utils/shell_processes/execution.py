@@ -36,7 +36,7 @@ def run_shell_command(
     cmd=decorate_command(cmd, positional_args, keyword_args)
 
 
-    com=f"There are already redirections (\'>\') in your command, provide them with designated keywords"
+    com=f"There are already redirections (\'>\') in your command, provide them with designated keywords.\nSupplied command string was: \'{cmd}\'"
     if not stdout_file is None or stderr_file is not None:
         assert not '>' in cmd, com
 

@@ -1,5 +1,8 @@
 from . import *
 import copy
+
+import logging
+logger = logging.getLogger(__name__)
 # from .parser_helper import check_is_controller
 
 def get_environment_var(string:str, expected_type:Literal['file']|None=None):
@@ -28,10 +31,12 @@ def check_is_controller(the_type):
     import types
     if type(the_type)==types.UnionType:
         examples= [ x for x in the_type.__args__ if issubclass(x,controller_model) ]
-        if len(examples)>1: raise Exception()
-        if len(examples)>0:
-            the_type=examples[0]
+        if len(examples)>0: 
             is_controller=True
+            the_type=examples[0]
+            if len(examples)>1:
+                logger.warning(f"Found multiple controller types as options for {examples} choosing the first:{examples[0]}"+
+                               f"\nIn the long term I should allow default to switch between these cases")
     elif issubclass(the_type, controller_model):
         is_controller=True
     return is_controller, the_type
@@ -110,6 +115,19 @@ class controller_model(BaseModel):
         default_name=type(self).__name__+'.yaml'
         filename=self.filename if self.filename is not None else default_name
         return os.path.join(self.directory, filename )
+    @staticmethod
+    @val_call
+    def make_placeholder(value:str):
+        return f"<{value}>"
+    @staticmethod
+    @val_call
+    def is_placeholder(value:str):
+        if len(value)>1:
+            if value.startswith('<'):
+                return True
+            else: return False
+        else:
+            return False
     
     def __init__(self, *args,**kwargs):
         
@@ -150,32 +168,34 @@ class controller_model(BaseModel):
         super().__init__(**kwargs)
         self.filename=filename
         self.directory=directory
-    def get_file_path(self, fi, directory=None):
-        
-        if directory is None: directory=self.directory
-
+    
+    @staticmethod
+    def decode_relative_path(fi:str, directory:pdtc_directory|None=None) -> pdtc_file:
         if fi.startswith('/'):
             return fi
         elif fi.startswith("$"):
-            import sys
-            assert len(fi)>1
+            assert len(fi)>1, f"Provided only $: syntax error"
             key=fi[1:]
             if not key in os.environ.keys(): raise Exception(f"Could not find environment variable \'{fi}\'")
             else: return os.environ[key]
         else:
             if directory is None:
-                return fi
+                raise Exception()
             else:
-                assert os.path.isdir(directory)
                 realpath=os.path.realpath( os.path.join(directory, fi) )
                 assert os.path.isfile(realpath)
                 return realpath
+
+    def get_file_path(self, fi, directory=None):
+        if directory is None: directory=self.directory
+        return self.decode_relative_path(fi, directory)
+
     def write(self, output_file: str| None =None) -> file:
         content=self.model_dump()
         if output_file is None:
             output_file=type(self).__name__+'_example.yaml'
         with open(output_file, 'w') as wr:
-            yaml.safe_dump(content, wr)
+            yaml.safe_dump(content, wr, sort_keys=False)
         return output_file
     #    """ Provides an example of this class. This function was conceived to print out example file that the user can then manipulate. """
     #@classmethod
@@ -266,7 +286,8 @@ class controller_model(BaseModel):
                 elif not is_required:
                     example =value.default
                 else:
-                    example = f"<required argument of type {str(the_type)}>"
+                    type_helper=the_type if not isinstance(the_type, EnumMeta) else f"str ({[ x.value for x in the_type]})"
+                    example = f"<required argument of type {str(type_helper)}>"
             
             import copy
             if isinstance(example, BaseModel): 

@@ -20,3 +20,6 @@ Copied get_nshell function form encoding_and_conversion.encoding (previously in 
 
 # v0.1.03 Minor Modifications to controller_model
 Mainly add convenience functionality to controller_model
+
+# v0.1.04 Parser model: placeholder and enum
+Added processing of Enums to parser model and method for generation of placeholder string
