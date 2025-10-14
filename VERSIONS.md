@@ -23,3 +23,7 @@ Mainly add convenience functionality to controller_model
 
 # v0.1.04 Parser model: placeholder and enum
 Added processing of Enums to parser model and method for generation of placeholder string
+
+# v0.1.04a Minor Patch
+No warning if multiple controll models are found wihtin Union.
+New file for get environment variable function. 

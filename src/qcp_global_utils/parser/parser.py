@@ -1,21 +1,14 @@
 from . import *
 import copy
 
+from qcp_global_utils.environment.environment_variables import get_environment_var
 import logging
 logger = logging.getLogger(__name__)
 # from .parser_helper import check_is_controller
 
-def get_environment_var(string:str, expected_type:Literal['file']|None=None):
-    
-    if string.startswith('$'):
-        assert len(string)>0, f"string is only dollar sign: {string}"
-        string=string[1:]
-    else:
-        assert len(string)>0, f"Provided empty string"
 
-    assert string in os.environ.keys(), f"Provided environment variable {string} but cannot be found"
-    the_return=os.environ[string]
-    assert len(the_return)>1, f"Could process '${string}' as environment variable, but this variable is empty!"
+def handle_environment_var(string:str, expected_type:Literal['file']|None=None):
+    the_return=get_environment_var(string)
 
     if expected_type is None: pass 
     elif expected_type=='file':
@@ -24,22 +17,25 @@ def get_environment_var(string:str, expected_type:Literal['file']|None=None):
 
     return the_return 
 
+import types
+def get_controller_types(the_type):
+    if type(the_type)!= types.UnionType:
+        return [the_type]
+    return [ x for x in the_type.__args__ if issubclass(x,controller_model) ]
+
 
 def check_is_controller(the_type):
     is_controller=False
     # For other controller class make recursive exmple
-    import types
     if type(the_type)==types.UnionType:
-        examples= [ x for x in the_type.__args__ if issubclass(x,controller_model) ]
-        if len(examples)>0: 
+        if len(get_controller_types(the_type))>0:
             is_controller=True
-            the_type=examples[0]
-            if len(examples)>1:
-                logger.warning(f"Found multiple controller types as options for {examples} choosing the first:{examples[0]}"+
-                               f"\nIn the long term I should allow default to switch between these cases")
+            # if len(examples)>1:
+            #     logger.warning(f"Found multiple controller types as options for {examples} choosing the first:{examples[0]}"+
+            #                    f"\nIn the long term I should allow default to switch between these cases")
     elif issubclass(the_type, controller_model):
         is_controller=True
-    return is_controller, the_type
+    return is_controller
 
 def process_input(*args,**kwargs):
     """Input may by a positional argument or in kwargs
@@ -62,7 +58,7 @@ def process_input(*args,**kwargs):
             del kwargs[input_key]
         return input, kwargs
     @val_call
-    def process_input(input:pdtc_file|str|None, kwargs:dict):
+    def process_input_inner(input:pdtc_file|str|None, kwargs:dict):
         """ 
         If input is None: do nothing, 
         if string with dollarsign:  then check for file under environment variable, 
@@ -73,7 +69,7 @@ def process_input(*args,**kwargs):
         elif isinstance(input, str):
             # Should be either environment variable that points to file or 
             if input.startswith('$'):
-                input=get_environment_var(input, expected_type='file')
+                input=handle_environment_var(input, expected_type='file')
             else:
                 assert os.path.isfile(input), f"Input is not a file: {input}"
             
@@ -92,7 +88,7 @@ def process_input(*args,**kwargs):
 
     input,kwargs=get_input(args, kwargs)
     args=[]
-    kwargs=process_input(input, kwargs)
+    kwargs=process_input_inner(input, kwargs)
 
     return args, kwargs
 
@@ -153,7 +149,7 @@ class controller_model(BaseModel):
 
         for key, value in self.__fields__.items():
             the_type=value.annotation
-            is_controler, the_type = check_is_controller(the_type)
+            is_controler = check_is_controller(the_type)
 
             if key in kwargs.keys():
                 if is_controler:
@@ -161,7 +157,8 @@ class controller_model(BaseModel):
                     if isinstance(val, str):
                         # If relative path define to current file
                         kwargs.update({key: copy.deepcopy(the_type(self.get_file_path(val, directory=directory)).model_dump())})
-                    kwargs[key].update({'filename':filename, 'directory':directory})
+                    elif not val is None:
+                        kwargs[key].update({'filename':filename, 'directory':directory})
                 else:
                     pass
 
@@ -268,7 +265,7 @@ class controller_model(BaseModel):
             the_type=value.annotation
             is_required=value.is_required()
 
-            is_controller, the_type=check_is_controller(the_type)
+            is_controller = check_is_controller(the_type)
 
 
             if key in kwargs.keys():
@@ -281,8 +278,10 @@ class controller_model(BaseModel):
                     example=the_type.example(**example)
             else:
                 if is_controller:
+                    the_types=get_controller_types(the_type)
+                    example=the_types[0].example()
                     # Deep copy is necessary to avoid yaml references.
-                    example=the_type.example()
+
                 elif not is_required:
                     example =value.default
                 else:
@@ -317,11 +316,12 @@ class controller_model(BaseModel):
             # Some basic information
             the_type=value.annotation
             is_required=value.is_required()
-            is_controller, the_type=check_is_controller(the_type)
+            is_controller = check_is_controller(the_type)
 
             provided= (key in kwargs.keys())
 
             if is_controller:
+                the_type=get_controller_types(the_type)[0]
                 value=the_type.default_kwargs()
                 if provided: value.update(kwargs[key])
                 base_kwargs.update({key:value})
