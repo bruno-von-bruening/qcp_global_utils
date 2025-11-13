@@ -74,7 +74,7 @@ class temporary_file(temporary_file_base):
             which=choice.tmp            
 
         ## Unpack 
-        def decompress(tmp_file):
+        def decompress(tmp_file, delete_old=False):
             extensions=['gz','xz']
             scripts={ #executbale for the given extension
                 'gz':'gzip',
@@ -93,32 +93,26 @@ class temporary_file(temporary_file_base):
                 run_shell_command(f"rm {uncomp_file}")
                 
             exec=scripts[ext]
-            cmd=f"{exec} -d {tmp_file}"
+            cmd=f"{exec} -d {'-k' if not delete_old else ''} {tmp_file}"
             run_shell_command(cmd)
             assert os.path.isfile(uncomp_file), f"Cannot find the file that should result from the \'{ext}\'-decompression ({cmd}): {uncomp_file}"
             return uncomp_file
+        
+        # In case this file is compressed, decompress it and delete the compressed file
+        is_compressed=any([ tmp_file.upper().endswith(ext.upper()) for ext in ['.gz','.xz']])
         if is_compressed:
-            tmp_file=decompress(tmp_file)
+            tmp_file=decompress(tmp_file, delete_old=True)
             
 
-        # If the tmp file is the same as source, then there is no tmp_file
-        if os.path.realpath(tmp_file)==os.path.realpath(source):
-            if copy:
-                tmp_file='tmp.'+os.path.basename(source)
-                run_shell_command(f"cp {source} {tmp_file}")
-                assert os.path.isfile(tmp_file)
-                the_which=choice.tmp
-            else:
-                tmp_file=None
-                the_which=choice.src
-        else:
-            the_which=choice.tmp
         # Assert the file lies in this directory and it exists
         def check_same_dir(tmp_file):
             return os.path.relpath(os.path.dirname(os.path.realpath(tmp_file)),os.getcwd())=='.'
-        if tmp_file is not None:
-            if not check_same_dir(tmp_file): raise Exception(f"Tmp file should be in present working directory ({os.getcwd()})\n{tmp_file}")
+        #if tmp_file is not None:
+        #    if not check_same_dir(tmp_file): raise Exception(f"Tmp file should be in present working directory ({os.getcwd()})\n{tmp_file}")
 
+        assert check_same_dir(tmp_file), f"Expected temporary file to be in pwd: {os.getcwd()} {tmp_file}"
+
+        the_which=choice.tmp
         return dict(
             source=source,
             tmp_file=tmp_file,
