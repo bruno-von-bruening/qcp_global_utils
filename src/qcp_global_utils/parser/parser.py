@@ -1,11 +1,27 @@
 from . import *
 import copy
 
+from typing import Annotated, Literal, Tuple
+from  pydantic import AfterValidator
+
 from qcp_global_utils.environment.environment_variables import get_environment_var
 import logging
 logger = logging.getLogger(__name__)
 # from .parser_helper import check_is_controller
 
+
+def make_placeholder(v:str):
+    return f"<{v}>"
+def is_placeholder(v:str):
+    if v.startswith('<') and v.endswith('>'):
+        return True
+    return False
+
+def is_no_placeholder(v:str):
+    if is_placeholder(v):
+        raise ValueError(f"Value is a dummy placeholder: {v}")
+    return v
+my_str = Annotated[str, AfterValidator(is_no_placeholder)]
 
 def handle_environment_var(string:str, expected_type:Literal['file']|None=None):
     the_return=get_environment_var(string)
@@ -60,7 +76,7 @@ def process_input(*args,**kwargs):
     @val_call
     def process_input_inner(input:pdtc_file|str|None, kwargs:dict):
         """ 
-        If input is None: do nothing, 
+        If input is None: do nothing, f"<{value}>"
         if string with dollarsign:  then check for file under environment variable, 
         if file: read the file
         """
@@ -114,7 +130,7 @@ class controller_model(BaseModel):
     @staticmethod
     @val_call
     def make_placeholder(value:str):
-        return f"<{value}>"
+        return make_placeholder(value)
     @staticmethod
     @val_call
     def is_placeholder(value:str):

@@ -146,8 +146,18 @@ class temporary_file(temporary_file_base):
             self.remove_src(verbose=verbose)
             self.remove_tmp(verbose=verbose)
 
+def is_json_file(the_file) -> bool:
+    """ Check if the file is json file by its ending """
+    return the_file.upper().endswith( '.JSON' )
+def is_yaml_file(the_file) -> bool:
+    """ Check if the file is yaml file by its ending """
+    return the_file.upper().endswith( '.YAML' )
 @val_call
-def load_json_or_yaml(the_file:file) -> Tuple[dict, list]:
+def is_json_or_yaml(the_file) -> bool:
+    """ Check if the file is json or yaml file by its ending """
+    return is_json_file(the_file) or is_yaml_file(the_file)
+@val_call
+def load_json_or_yaml(the_file) -> Tuple[dict, list]:
     """ """ 
     def read_the_file(the_file):
         # Read the file
@@ -155,9 +165,9 @@ def load_json_or_yaml(the_file:file) -> Tuple[dict, list]:
             content=rd.read()
         
         # Process the content to object
-        if the_file.upper().endswith( '.JSON' ):
+        if is_json_file(the_file):
             content=json.loads(content)
-        elif the_file.upper().endswith( '.YAML' ):
+        elif is_yaml_file(the_file):
             content=yaml.safe_load(content)
         else:
             raise Exception(f"Unkown ending of file (\'{the_file}\')")
