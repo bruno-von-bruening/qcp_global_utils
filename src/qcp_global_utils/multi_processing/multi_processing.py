@@ -15,7 +15,7 @@ def spawn_workers(jobs:List[dict], num_processes:int):
         the_function=job['function']
         args=job['args']
         kwargs=job['kwargs']
-        run=pool.apply_async(the_function , [ args, *kwargs] )
+        run=pool.apply_async(the_function , [ args, ], kwargs )
         Runs.append(run)
                 
     finished_jobs=[]

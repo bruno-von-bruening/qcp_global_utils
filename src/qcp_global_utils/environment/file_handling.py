@@ -58,21 +58,17 @@ class temporary_file(temporary_file_base):
         super().__init__(**info)
 
     def handle_source(self,source, copy):
-        # If its a link unlink first
-        tmp_file=source
+        # Assert that source is not in pwd (also considers the file a link it pointing to [gets dereferenced with realpath])        
+        #assert os.getcwd()!=os.path.dirname(os.path.realpath(source)), f"Source file is in current working directory: {os.path.realpath(source)}"
 
-        # Copy file?
-        is_link=os.path.islink(tmp_file)
-        is_compressed=any([ tmp_file.upper().endswith(ext.upper()) for ext in ['.gz','.xz']])
-        if any([is_link, is_compressed, copy]):
-            old_file=tmp_file
-            tmp_file='tmp.'+os.path.basename(tmp_file)
-            run_shell_command(f"cp {os.path.realpath(old_file)} {tmp_file}")
-            assert os.path.isfile(tmp_file), f"Expected but does not exist: {tmp_file} (pwd: {os.getcwd()})"
-            which=choice.tmp            
+
+        # Make a copy of this file
+        tmp_file='tmp.'+os.path.basename(source)
+        run_shell_command(f"cp {os.path.realpath(source)} {tmp_file}")
+        assert os.path.isfile(tmp_file), f"Expected but does not exist: {tmp_file} (pwd: {os.getcwd()})"
 
         ## Unpack 
-        def decompress(tmp_file):
+        def decompress(tmp_file, delete_old=False):
             extensions=['gz','xz']
             scripts={ #executbale for the given extension
                 'gz':'gzip',
@@ -86,32 +82,26 @@ class temporary_file(temporary_file_base):
 
             uncomp_file=tmp_file.replace(f".{ext}",'')
             exec=scripts[ext]
-            cmd=f"{exec} -d {tmp_file}"
+            cmd=f"{exec} -d {'-k' if not delete_old else ''} {tmp_file}"
             run_shell_command(cmd)
             assert os.path.isfile(uncomp_file), f"Cannot find the file that should result from the \'{ext}\'-decompression ({cmd}): {uncomp_file}"
             return uncomp_file
+        
+        # In case this file is compressed, decompress it and delete the compressed file
+        is_compressed=any([ tmp_file.upper().endswith(ext.upper()) for ext in ['.gz','.xz']])
         if is_compressed:
-            tmp_file=decompress(tmp_file)
+            tmp_file=decompress(tmp_file, delete_old=True)
             
 
-        # If the tmp file is the same as source, then there is no tmp_file
-        if os.path.realpath(tmp_file)==os.path.realpath(source):
-            if copy:
-                tmp_file='tmp.'+os.path.basename(source)
-                run_shell_command(f"cp {source} {tmp_file}")
-                assert os.path.isfile(tmp_file)
-                the_which=choice.tmp
-            else:
-                tmp_file=None
-                the_which=choice.src
-        else:
-            the_which=choice.tmp
         # Assert the file lies in this directory and it exists
         def check_same_dir(tmp_file):
             return os.path.relpath(os.path.dirname(os.path.realpath(tmp_file)),os.getcwd())=='.'
-        if tmp_file is not None:
-            if not check_same_dir(tmp_file): raise Exception(f"Tmp file should be in present working directory ({os.getcwd()})\n{tmp_file}")
+        #if tmp_file is not None:
+        #    if not check_same_dir(tmp_file): raise Exception(f"Tmp file should be in present working directory ({os.getcwd()})\n{tmp_file}")
 
+        assert check_same_dir(tmp_file), f"Expected temporary file to be in pwd: {os.getcwd()} {tmp_file}"
+
+        the_which=choice.tmp
         return dict(
             source=source,
             tmp_file=tmp_file,
@@ -162,3 +152,23 @@ def load_json_or_yaml(the_file:file) -> Tuple[dict, list]:
         raise Exception(f"Could not process file (\'{the_file}\') as yaml or json file:\n error={ex}")
 
     return content
+
+@validate_call
+def compress_file(the_file:file, compression_type:str='xz', compression_level:int|None=None) -> file:
+    """
+    Compresses file with either xz or gz method
+    Could also implement thread usage for xz if performance needs to be improved
+    """
+
+    known_compression=['xz','gz']
+    assert compression_type in known_compression, f"Unkown compression type: \'{compression_type}\'"
+
+    comp_level=f"-{compression_level}" if compression_level is not None else ''
+    
+    run_shell_command(
+        ' '.join([compression_type, comp_level, the_file ]) 
+    )
+    compressed_file=f"{the_file}.xz"
+    assert  os.path.isfile(compressed_file), compressed_file
+
+    return compressed_file
