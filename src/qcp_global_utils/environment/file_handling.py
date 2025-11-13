@@ -195,3 +195,23 @@ def dump_content_to_file(content, output_file:str) -> file:
     with open(output_file, 'w') as wr:
         func(content, wr)
     return output_file
+
+@validate_call
+def compress_file(the_file:file, compression_type:str='xz', compression_level:int|None=None) -> file:
+    """
+    Compresses file with either xz or gz method
+    Could also implement thread usage for xz if performance needs to be improved
+    """
+
+    known_compression=['xz','gz']
+    assert compression_type in known_compression, f"Unkown compression type: \'{compression_type}\'"
+
+    comp_level=f"-{compression_level}" if compression_level is not None else ''
+
+    run_shell_command(
+        ' '.join([compression_type, comp_level, the_file ])
+    )
+    compressed_file=f"{the_file}.xz"
+    assert  os.path.isfile(compressed_file), compressed_file
+
+    return compressed_file
