@@ -30,6 +30,8 @@ class temporary_file_base(BaseModel):
     source: file
     tmp_file: file | None
     which:  choice = choice.tmp
+    overwrite: bool=False
+
     @property
     def file(self):
         if self.which==choice.tmp:
@@ -51,21 +53,25 @@ class temporary_file(temporary_file_base):
     Else:
         works with uncomprsessed copy of the file
     """
-    def __init__(self, fi, copy=False):
+    def __init__(self, fi, copy=False, overwrite=False):
         # In case its a symlink copy to local dir
         source=fi
-        info=self.handle_source(source,copy)
-        super().__init__(**info)
+        info=self.handle_source(source,copy, overwrite=overwrite)
+        super().__init__(**info, overwrite=overwrite)
 
-    def handle_source(self,source, copy):
-        # Assert that source is not in pwd (also considers the file a link it pointing to [gets dereferenced with realpath])        
-        #assert os.getcwd()!=os.path.dirname(os.path.realpath(source)), f"Source file is in current working directory: {os.path.realpath(source)}"
+    def handle_source(self,source, copy, overwrite=False):
+        # If its a link unlink first
+        tmp_file=source
 
-
-        # Make a copy of this file
-        tmp_file='tmp.'+os.path.basename(source)
-        run_shell_command(f"cp {os.path.realpath(source)} {tmp_file}")
-        assert os.path.isfile(tmp_file), f"Expected but does not exist: {tmp_file} (pwd: {os.getcwd()})"
+        # Copy file?
+        is_link=os.path.islink(tmp_file)
+        is_compressed=any([ tmp_file.upper().endswith(ext.upper()) for ext in ['.gz','.xz']])
+        if any([is_link, is_compressed, copy]):
+            old_file=tmp_file
+            tmp_file='tmp.'+os.path.basename(tmp_file)
+            run_shell_command(f"cp {os.path.realpath(old_file)} {tmp_file}")
+            assert os.path.isfile(tmp_file), f"Expected but does not exist: {tmp_file} (pwd: {os.getcwd()})"
+            which=choice.tmp            
 
         ## Unpack 
         def decompress(tmp_file, delete_old=False):
@@ -81,6 +87,11 @@ class temporary_file(temporary_file_base):
             ext=get_ext(tmp_file)
 
             uncomp_file=tmp_file.replace(f".{ext}",'')
+            if os.path.isfile(uncomp_file) and not overwrite:
+                raise Exception(f"File {uncomp_file} allready exists and overwrite is deativated. Provide overwrite key to {temporary_file} to overwrite.")
+            else:
+                run_shell_command(f"rm {uncomp_file}")
+                
             exec=scripts[ext]
             cmd=f"{exec} -d {'-k' if not delete_old else ''} {tmp_file}"
             run_shell_command(cmd)
@@ -141,7 +152,7 @@ def load_json_or_yaml(the_file:file) -> Tuple[dict, list]:
         if the_file.upper().endswith( '.JSON' ):
             content=json.loads(content)
         elif the_file.upper().endswith( '.YAML' ):
-            content=yaml.save_load(content)
+            content=yaml.safe_load(content)
         else:
             raise Exception(f"Unkown ending of file (\'{the_file}\')")
         return content
@@ -153,22 +164,24 @@ def load_json_or_yaml(the_file:file) -> Tuple[dict, list]:
 
     return content
 
-@validate_call
-def compress_file(the_file:file, compression_type:str='xz', compression_level:int|None=None) -> file:
-    """
-    Compresses file with either xz or gz method
-    Could also implement thread usage for xz if performance needs to be improved
-    """
+@val_call
+def dump_content_to_file(content, output_file:str) -> file:
+    """ Give an object to drop and the name of the outputfile
+    The outputfile needs to have a recognized extension (at the moment yaml or json) to dump it automatically"""
+    def extension_match(ext):
+        return output_file.lower().endswith( '.'+ext.lstrip('.'))
+    def dump_yaml(content, wr):
+        yaml.safe_dump(content, wr)
+    def dump_json(content, wr):
+        json.dump(content, wr)
 
-    known_compression=['xz','gz']
-    assert compression_type in known_compression, f"Unkown compression type: \'{compression_type}\'"
+    def func_map():
+        if extension_match('yaml'): func=dump_yaml
+        elif extension_match('json'): func=dump_json
+        else: raise Exception(f"No default dumping procedure implemented for this extension: {output_file}")
+        return func
 
-    comp_level=f"-{compression_level}" if compression_level is not None else ''
-    
-    run_shell_command(
-        ' '.join([compression_type, comp_level, the_file ]) 
-    )
-    compressed_file=f"{the_file}.xz"
-    assert  os.path.isfile(compressed_file), compressed_file
-
-    return compressed_file
+    func=func_map()
+    with open(output_file, 'w') as wr:
+        func(content, wr)
+    return output_file

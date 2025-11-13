@@ -1,4 +1,5 @@
 build/
 dist/
+back/
 **.egg-info/
 add_to_shell_init.txt
