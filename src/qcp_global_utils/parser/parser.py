@@ -34,24 +34,55 @@ def handle_environment_var(string:str, expected_type:Literal['file']|None=None):
     return the_return 
 
 import types
-def get_controller_types(the_type):
-    if type(the_type)!= types.UnionType:
-        return [the_type]
-    return [ x for x in the_type.__args__ if issubclass(x,controller_model) ]
 
+# def get_controller_types(the_type):
+#     if type(the_type)!= types.UnionType:
+#         return [the_type]
+#     return [ x for x in the_type.__args__ if issubclass(x,controller_model) ]
+
+
+def convert_type(tp):
+    """Return list of types or None from a Union (PEP 604 or typing.Union)."""
+    # Case 1: plain type (not a union)
+    if tp is None:
+        return [tp]
+    # Case 2: new-style union (PEP 604: X | Y)
+    elif isinstance(tp, type):
+        if isinstance(tp, (types.UnionType, Annotated)):
+            return [t if t is not type(None) else None for t in get_args(tp)]
+        else:
+            return [tp]
+    # Case 3: old-style typing.Union[X, Y]
+    else:
+        origin = getattr(tp, "__origin__", None)
+        if isinstance(origin, type):
+            return [origin]
+        elif origin is types.UnionType or origin is Union or origin is Annotated or origin is None:
+            return [t if t is not type(None) else None for t in get_args(tp)]
+        else:
+            raise Exception(tp)
+
+def is_controller_type(the_type):
+    if the_type is None:
+        return False
+    else:
+        if isinstance(the_type, type):
+            return issubclass(the_type, controller_model)
+        else:
+            types=convert_type(the_type)
+            return any( is_controller_type(x) for x in  types)
 
 def check_is_controller(the_type):
     is_controller=False
     # For other controller class make recursive exmple
-    if type(the_type)==types.UnionType:
-        if len(get_controller_types(the_type))>0:
-            is_controller=True
-            # if len(examples)>1:
-            #     logger.warning(f"Found multiple controller types as options for {examples} choosing the first:{examples[0]}"+
-            #                    f"\nIn the long term I should allow default to switch between these cases")
-    elif issubclass(the_type, controller_model):
-        is_controller=True
-    return is_controller
+    the_types=convert_type(the_type)
+
+    # for x in the_types:
+    #     print(x, type(x), x is  None)
+    #     issubclass(x, controller_model)
+
+
+    return any( is_controller_type(x) for x in the_types )
 
 def process_input(*args,**kwargs):
     """Input may by a positional argument or in kwargs

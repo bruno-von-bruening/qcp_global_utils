@@ -19,7 +19,7 @@ def spawn_workers(jobs:List[job], num_processes:int):
     assert len(jobs)<=num_processes, f"More jobs than processes, batching system not implemented yet (think also about using queueing system)"
     Runs=[]
     for job in jobs:
-        run=pool.apply_async(job.function, [job.args, *job.kwargs ])
+        run=pool.apply_async(job.function, job.args, job.kwargs )
         Runs.append(run)
                 
     finished_jobs=[]

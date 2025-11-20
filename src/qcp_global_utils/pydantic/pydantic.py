@@ -46,3 +46,11 @@ def list_to_string(the_list):
     return json.dumps(the_list)
 
 my_list=Annotated[ List[int|float|str|file], PlainSerializer(list_to_string) ]
+
+class myBaseModel(BaseModel):
+    """ I do not like when extra keys are just ignored (usually they hide a mismatch in key string leading to erroneous read)
+    arbitrary_types necessary for allowing non-standard types (like np.ndarray)
+    """
+    class Config:
+        arbitrary_types_allowed = True
+        extra = 'forbid'
