@@ -34,7 +34,30 @@ def run_shell_command(
         return cmd
 
     cmd=decorate_command(cmd, positional_args, keyword_args)
-
+    
+    # Escape parentheses if they are not already escaped
+    def escape_parentheses(cmd_str):
+        """
+        Escape ( and ) characters in the command string if they are not already escaped
+        """
+        result = ""
+        i = 0
+        while i < len(cmd_str):
+            char = cmd_str[i]
+            if char in ['(', ')']:
+                # Check if it's already escaped (preceded by \)
+                if i > 0 and cmd_str[i-1] == '\\':
+                    # Already escaped, keep as is
+                    result += char
+                else:
+                    # Not escaped, add escape
+                    result += '\\' + char
+            else:
+                result += char
+            i += 1
+        return result
+    
+    cmd = escape_parentheses(cmd)
 
     com=f"There are already redirections (\'>\') in your command, provide them with designated keywords.\nSupplied command string was: \'{cmd}\'"
     if not stdout_file is None or stderr_file is not None:
@@ -69,9 +92,15 @@ def run_shell_command(
     if time_limit is None:
         stdout, stderr = [x.decode('utf-8') for x in p.communicate() ]
         if stdout_file is not None:
-            stdout=get_out(stdout, stdout_file)
+            try:
+                stdout=get_out(stdout, stdout_file)
+            except Exception as ex:
+                raise Exception(f"Could not read the output file \'{stdout_file}\' ({os.getcwd()}). {stderr} Original error: {ex}") from ex
         if stderr_file is not None:
-            stderr=get_out(stderr, stderr_file)
+            try:
+                stderr=get_out(stderr, stderr_file)
+            except Exception as ex:
+                raise Exception(f"Could not read the output file \'{stdout_file}\' ({os.getcwd()}) . Original error: {ex}") from ex
     else:
         raise Exception(f"Time limit not implemented yet")
 
