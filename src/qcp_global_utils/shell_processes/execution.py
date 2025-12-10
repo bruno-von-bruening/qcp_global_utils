@@ -40,10 +40,21 @@ def run_shell_command(
     if not stdout_file is None or stderr_file is not None:
         assert not '>' in cmd, com
 
+
+    process_std=False
     if stdout_file is not None:
+        process_std=True
         cmd=cmd+f" 1> {stdout_file}"
     if stderr_file is not None:
+        process_std=True
         cmd=cmd+f" 2> {stderr_file}"
+
+    # I may run my main window within a tmux session (or zoomed in whatsoever)
+    # The output display will depend on that and maybe even get truncated (python rich)
+    # COLUMNS should fix that within bashb
+    if process_std:
+        cmd=f"stty cols 120; {cmd}"  # on zsh also export COLUMNS=120 would work
+    
     @validate_call
     def get_out(base_str:str, the_file:file) -> str:
         with open(the_file,'r') as rd:
