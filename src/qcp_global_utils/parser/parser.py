@@ -35,10 +35,10 @@ def handle_environment_var(string:str, expected_type:Literal['file']|None=None):
 
 import types
 
-# def get_controller_types(the_type):
-#     if type(the_type)!= types.UnionType:
-#         return [the_type]
-#     return [ x for x in the_type.__args__ if issubclass(x,controller_model) ]
+def get_controller_types(the_type):
+    if type(the_type)!= types.UnionType:
+        return [the_type]
+    return [ x for x in the_type.__args__ if issubclass(x,controller_model) ]
 
 
 def convert_type(tp):
@@ -326,6 +326,8 @@ class controller_model(BaseModel):
             else:
                 if is_controller:
                     the_types=get_controller_types(the_type)
+                    if len(the_types)!=1:
+                        raise Exception(f"Could not determine controller type for field {key} in class {cls.__name__}: {the_types}")
                     example=the_types[0].example()
                     # Deep copy is necessary to avoid yaml references.
 
@@ -368,7 +370,10 @@ class controller_model(BaseModel):
             provided= (key in kwargs.keys())
 
             if is_controller:
-                the_type=get_controller_types(the_type)[0]
+                the_type=get_controller_types(the_type)
+                if len(the_type)!=1:
+                    raise Exception(f"Could not determine controller type for field {key} in class {cls.__name__}: {the_type}")
+                the_type=the_type[0]
                 value=the_type.default_kwargs()
                 if provided: value.update(kwargs[key])
                 base_kwargs.update({key:value})

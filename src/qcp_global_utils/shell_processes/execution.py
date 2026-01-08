@@ -1,5 +1,6 @@
 from . import *
 from ..pydantic.pydantic import file, directory
+from qcp_global_utils.util.import_helper import val_call
 
 @validate_call
 def run_shell_command(
@@ -78,7 +79,7 @@ def run_shell_command(
     if process_std:
         cmd=f"stty cols 120; {cmd}"  # on zsh also export COLUMNS=120 would work
     
-    @validate_call
+    @val_call
     def get_out(base_str:str, the_file:file) -> str:
         with open(the_file,'r') as rd:
             content=rd.read()
@@ -95,12 +96,12 @@ def run_shell_command(
             try:
                 stdout=get_out(stdout, stdout_file)
             except Exception as ex:
-                raise Exception(f"Could not read the output file \'{stdout_file}\' ({os.getcwd()}). {stderr} Original error: {ex}") from ex
+                raise Exception(f"Could not read the output file \'{stdout_file}\' ({os.getcwd()}). {stderr}.\n Command was: {cmd}\n Original error: {ex}") from ex
         if stderr_file is not None:
             try:
                 stderr=get_out(stderr, stderr_file)
             except Exception as ex:
-                raise Exception(f"Could not read the output file \'{stdout_file}\' ({os.getcwd()}) . Original error: {ex}") from ex
+                raise Exception(f"Could not read the output file \'{stderr_file}\' ({os.getcwd()}). {stderr}.\n Command was: {cmd}\n Original error: {ex}") from ex
     else:
         raise Exception(f"Time limit not implemented yet")
 
