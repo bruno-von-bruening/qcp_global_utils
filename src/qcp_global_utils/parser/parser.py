@@ -37,7 +37,7 @@ import types
 
 def get_controller_types(the_type):
     if type(the_type)!= types.UnionType:
-        return [the_type]
+        return [ the_type ] 
     return [ x for x in the_type.__args__ if issubclass(x,controller_model) ]
 
 
@@ -54,13 +54,15 @@ def convert_type(tp):
             return [tp]
     # Case 3: old-style typing.Union[X, Y]
     else:
+        from typing import get_origin
         origin = getattr(tp, "__origin__", None)
-        if isinstance(origin, type):
+        origin=get_origin(tp)
+        if isinstance(origin, type) or origin in [Literal]:
             return [origin]
         elif origin is types.UnionType or origin is Union or origin is Annotated or origin is None:
             return [t if t is not type(None) else None for t in get_args(tp)]
         else:
-            raise Exception(tp)
+            raise Exception(f"{origin} ({type(origin)} for {tp}, issubclass of type: {issubclass(type(tp), type)} is literal :) is not a recognized Union type")
 
 def is_controller_type(the_type):
     if the_type is None:
@@ -313,29 +315,50 @@ class controller_model(BaseModel):
             is_required=value.is_required()
 
             is_controller = check_is_controller(the_type)
+            print(key, is_controller)
 
+            # if key in kwargs.keys():
+            #     example=kwargs[key]
+            # elif key in example_kwargs.keys():
+            #     example=example_kwargs[key]
+            #     if is_controller and isinstance(example,dict):
+            #         example=the_type.example(**example)
+            # else:
+            if is_controller: # there may be different controller types in which case we need to apply some logic
 
-            if key in kwargs.keys():
+                # Identify possible controller types
+                the_types=get_controller_types(the_type)
+                assert len(the_types)>0, f"Could not determine controller type for field {key} in class {cls.__name__}: {the_types}"
+
+                def try_match(typ,kwargs={}, critical=True):
+                    try:
+                        return typ.example(**kwargs)
+                    except:
+                        return None
+
+                # If only one model is there then its trivial, otherwise check if the provided input can be matched!
+                if len(the_types)==1:
+                    example=try_match(the_types[0], kwargs.get(key, {}))
+                elif len(the_types)>1:
+                    if not key in kwargs.keys():
+                        raise Exception(f"Could not determine controller type for field {key} in class degenerate options: {the_types}\nProvide key \'{key}\' in example() call to specify which one to use.")
+                    else:
+                        matches=[]
+                        for t in the_types:
+                            ret= try_match(t, kwargs[key], critical=False) 
+                            if not ret is None:
+                                matches.append(ret)
+                        if len(matches)!=1:
+                            raise Exception(f"Could not determine controller type for field {key} in class {cls.__name__}: {the_types}\nProvided value: {kwargs[key]}\nMatched types: {matches}")
+                        example=matches[0]
+
+            elif key in kwargs.keys():
                 example=kwargs[key]
-                if is_controller and isinstance(example,dict):
-                    example=the_type.example(**example)
-            elif key in example_kwargs.keys():
-                example=example_kwargs[key]
-                if is_controller and isinstance(example,dict):
-                    example=the_type.example(**example)
+            elif not is_required:
+                example =value.default
             else:
-                if is_controller:
-                    the_types=get_controller_types(the_type)
-                    if len(the_types)!=1:
-                        raise Exception(f"Could not determine controller type for field {key} in class {cls.__name__}: {the_types}")
-                    example=the_types[0].example()
-                    # Deep copy is necessary to avoid yaml references.
-
-                elif not is_required:
-                    example =value.default
-                else:
-                    type_helper=the_type if not isinstance(the_type, EnumMeta) else f"str ({[ x.value for x in the_type]})"
-                    example = f"<required argument of type {str(type_helper)}>"
+                type_helper=the_type if not isinstance(the_type, EnumMeta) else f"str ({[ x.value for x in the_type]})"
+                example = f"<required argument of type {str(type_helper)}>"
             
             import copy
             if isinstance(example, BaseModel): 
