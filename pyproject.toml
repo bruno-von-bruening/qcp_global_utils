@@ -1,6 +1,7 @@
 [project]
+# version = "0.1.03"
 name = "qcp_global_utils"
-version = "0.1.03"
+dynamic=['version']
 description = ''
 readme = "README.md"
 requires-python = ">=3.8"
@@ -8,3 +9,10 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
 ]
+
+[tool.setuptools_scm]
+version_file = "src/qcp_global_utils/_version.py" # Make a version file (can the be used by this very package)
+
+[build-system]
+requires = ["setuptools>=80", "wheel", "setuptools_scm>=8"]
+build-backend = "setuptools.build_meta"
