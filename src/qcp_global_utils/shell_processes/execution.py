@@ -89,7 +89,7 @@ def run_shell_command(
     # Execute
     if display_command:
         print(f"# WILL RUN:\n    {cmd}")
-    p=sp.Popen(cmd, shell=True, stderr=sp.PIPE, stdout=sp.PIPE)
+    p=sp.Popen(cmd, shell=True, executable='/bin/bash', stderr=sp.PIPE, stdout=sp.PIPE)
     if time_limit is None:
         stdout, stderr = [x.decode('utf-8') for x in p.communicate() ]
         if stdout_file is not None:

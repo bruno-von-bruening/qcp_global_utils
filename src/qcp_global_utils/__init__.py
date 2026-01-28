@@ -6,6 +6,7 @@ from typing import(
 )
 import os
 
-import importlib.metadata
-__version__ = importlib.metadata.version("qcp_global_utils")
+from ._version import __version__
+# import importlib.metadata
+# __version__ = importlib.metadata.version("qcp_global_utils")
 

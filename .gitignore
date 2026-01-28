@@ -3,3 +3,5 @@ dist/
 back/
 **.egg-info/
 add_to_shell_init.txt
+
+src/qcp_global_utils/_version.py

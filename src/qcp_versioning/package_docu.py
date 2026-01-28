@@ -1,3 +1,4 @@
+from .helper import VERSION_EXPECTED_FORM, VERSION_EXPECTED_FORM_READABLE
 
 import importlib, yaml, os
 import yaml, datetime
@@ -26,7 +27,7 @@ def load_version(package_name: str) -> str:
         pac=importlib.import_module(package_name)
         return pac.__version__
     except Exception as ex:
-        warn(f"could not import version information: {str(ex)}")
+        warn(f"{package_name}:could not import version information: {str(ex)}")
         return f"unknown"
 def generate_remote(git_repo:str, package_name:str, version=None):
     """ Generates a remote path for a package hosted on GitHub.
@@ -42,18 +43,27 @@ def generate_remote(git_repo:str, package_name:str, version=None):
             version,*meta=version.split('+')
             import re
             if version=='unknown':
-                warn(f"Provided unknown version, will use the main branch")
+                warn(f"{package_name}: provided unknown version, will use the main branch")
                 return 'main'
             else:
-                assert re.match(r'[v]?\d+\.\d+\.\d+[\..*]?', version), f"Cannot process version {version}. Expected format: [v]X.Y.Z.devtag+commit_hash"
+                assert re.fullmatch(VERSION_EXPECTED_FORM, version), f"Cannot process version {version} of {package_name}. Expected format: {VERSION_EXPECTED_FORM_READABLE}"
                 if len(meta)<1:
                     version=version
                 else:
                     if len(meta)>1:
-                        raise Exception(f"Cannot process version {version}. Expected format: X.Y.Z+commit_hash.dateinfo (meta is {meta})")
-                    parts=meta[-1].split('.')
-                    if len(parts)!=2: raise Exception(f"Cannot process version {version}. Expected format: X.Y.Z+commit_hash.dateinfo")
-                    version=parts[0]
+                        raise Exception(f"Cannot process version {version}. Expected format: {VERSION_EXPECTED_FORM_READABLE} (meta is {meta})")
+                    version,*tags=meta[-1].split('.')
+                    if len(tags)>0:
+                        if len(tags)>1:
+                            raise Exception(f"Cannot process version {version}. Expected format: {VERSION_EXPECTED_FORM_READABLE} (tags are {tags})")
+                        dirty=tags[0]
+                        assert re.match(r'd.*', dirty), f"Cannot process version {version}. Expected format: {VERSION_EXPECTED_FORM_READABLE} (found dirty tag {dirty})"
+                        warn(f"{package_name}: version {version} is dirty ({dirty}), please check if you should commit something!")
+
+                # If hash comes from git, it starts with 'g' (that's what we expect since we work with git)
+                # Notably the has may be longer since git truncates in app display to 7 chars
+                assert version.startswith('g'), f"Version should come from git! Found {version} but should start with 'g'"
+                version=version[1:]
             return version
         ver=process_version(version)
     path=f"{git_repo}/{package_name.replace('.git','')}.git"
@@ -70,7 +80,7 @@ def dump_versions(versions):
     })
     with open(version_file, 'w') as f:
         yaml.safe_dump(versions, f)
-    debug(f"Wrote package versions to file {version_file}")
+    info(f"Wrote package versions to file {version_file}")
     return version_file
 
 def make_versions(pacs:List[str]) -> dict:
@@ -131,34 +141,63 @@ def drop_versions(packages:List[str]):
 
 from qcp_global_utils.environment.file_handling import load_json_or_yaml
 from qcp_global_utils.pydantic.pydantic import pdtc_file
+from qcp_install.install import conda_update_env
 
+def test_install():
+    """ Test installation of conda environment file """
 
 @val_call
 def main(
     main_package:str, 
     dependencies:List[str], 
-    conda_env_file: pdtc_file
+    conda_env_file: pdtc_file|None=None,
+    test:bool=True,
+    no_update:bool=False,
 ) -> None:
-    packages=[
-        main_package,
-        *dependencies
-    ]
-    versions_file=drop_versions(packages)
+    
+    update=not no_update
 
-    # Load versions from file
-    versions=load_json_or_yaml(versions_file)
+    if update:
+        packages=[
+            main_package,
+            *dependencies
+        ]
+        versions_file=drop_versions(packages)
 
-    # Load conda environment file
-    env_content=load_json_or_yaml(conda_env_file)
+        # Load versions from file
+        versions=load_json_or_yaml(versions_file)
 
-    # update old entries
-    brunos_git='git+ssh://git@github.com/bruno-von-bruening'
-    remotes=dict( (pac, generate_remote(brunos_git, pac, version=ver)) for pac,ver in versions.items() if not pac.startswith('_') )
-    env_content=update_env(env_content, remotes)
+        brunos_git='git+ssh://git@github.com/bruno-von-bruening'
+        remotes=dict( (pac, generate_remote(brunos_git, pac, version=ver)) for pac,ver in versions.items() if not pac.startswith('_') and pac in dependencies )
+    else:
+        if not test:
+            print(f"Neither update nor test requested, nothing to do!")
 
     # Write new conda environment file
-    new_env_file='test_'+conda_env_file
-    with open(new_env_file, 'w') as wr:
-        yaml.dump(env_content, wr, sort_keys=False, indent=2) # same ordering as initial data
-        info(f"Wrote new environment file: {new_env_file}")
+    if conda_env_file:
+        # Load conda environment file
+        env_content=load_json_or_yaml(conda_env_file)
+        if not no_update:
+            # update old entries
+            env_content=update_env(env_content, remotes)
+
+            new_env_file='test_'+conda_env_file
+            with open(new_env_file, 'w') as wr:
+                yaml.dump(env_content, wr, sort_keys=False, indent=2) # same ordering as initial data
+                info(f"Wrote new environment file: {new_env_file}")
+        else:
+            new_env_file=conda_env_file
+    else:
+        new_env_file=None
+
+    if test:
+        if not conda_env_file:
+            raise Exception("Cannot test installation since no conda_env_file was provided to be updated!")
+        info(f"Test requested: will try to update conda environment from file {new_env_file}...")
+        try:
+            conda_update_env(new_env_file)
+        except Exception as ex:
+            raise Exception(f"Could not update conda environment from file {new_env_file}: {ex}")
+
     return new_env_file
+
