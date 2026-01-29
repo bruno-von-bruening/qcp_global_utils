@@ -21,6 +21,11 @@ info= lambda msg: logger.info(f"INFO: {msg}")
 debug= lambda msg: logger.debug(f"DEBUG: {msg}")
 
 
+def make_test_name(ti:str) -> str:
+    return os.path.join(
+        os.path.dirname(ti), f"test_{os.path.basename(ti)}"
+    )
+
 def load_version(package_name: str) -> str:
     """ Assumes that each provided package has a __version__ variable provided in e.g. a _version.py file"""
     try:
@@ -98,7 +103,7 @@ def update_env(conda_env:dict, remotes:dict, name=None) -> dict:
     if name:
         new_env['name']=name
     else:
-        new_env['name']=f"test_{new_env['name']}"
+        new_env['name']=make_test_name(new_env['name'])
 
     # The versions will go into dependencies
     if not 'dependencies' in new_env:
@@ -181,7 +186,7 @@ def main(
             # update old entries
             env_content=update_env(env_content, remotes)
 
-            new_env_file='test_'+conda_env_file
+            new_env_file=make_test_name(conda_env_file)
             with open(new_env_file, 'w') as wr:
                 yaml.dump(env_content, wr, sort_keys=False, indent=2) # same ordering as initial data
                 info(f"Wrote new environment file: {new_env_file}")
