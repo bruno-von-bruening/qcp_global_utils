@@ -288,7 +288,7 @@ class controller_model(BaseModel):
     #    return example_kwargs 
     __example_values__={}
     @classmethod
-    def example(cls, **kwargs) -> dict:
+    def example(cls, exclude:None|List[str]=None, **kwargs) -> dict:
         """ Provides an example of this class. This function was conceived to print out example file that the user can then manipulate. """
         # Could also just iterate over all method attributed and add a <fill-in> as value
         # -> elaborate on that later
@@ -308,6 +308,9 @@ class controller_model(BaseModel):
         # Make a dictionary of this class
         new_kwargs={}
         for key, value in cls.__fields__.items():
+            if exclude:
+                if key in exclude:
+                    continue
             if value.exclude:
                 continue
 
@@ -315,7 +318,6 @@ class controller_model(BaseModel):
             is_required=value.is_required()
 
             is_controller = check_is_controller(the_type)
-            print(key, is_controller)
 
             # if key in kwargs.keys():
             #     example=kwargs[key]
