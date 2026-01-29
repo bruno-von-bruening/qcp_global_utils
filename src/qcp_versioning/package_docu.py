@@ -201,3 +201,34 @@ def main(
 
     return new_env_file
 
+
+def main_parser(MAIN_PKG, DEPENDENCIES):
+
+    import argparse as ap
+    desc="Export the conda environment with the current package versions." \
+    "If nothing provided then just print a yaml file informing about the current environment." \
+    "If a conda environment file is provided, then update it with the current package versions." 
+    epilog='\n'.join(["Example usage:"]+[ f"  - {x} : {y}" for x,y in [
+        ('Print current environment info to file', 'qcp_export_envo.py'),
+        ('Update existing conda environment file', 'qcp_export_envo.py -f <my_envo>.yaml'),
+        ('Test updated conda environment', 'qcp_export_envo.py -f <my_envo>.yaml -t'),
+    ] ] +[
+        f"Finally activate this environment and check if it passes the tests."
+    ])
+    par=ap.ArgumentParser(description=desc, epilog=epilog, formatter_class=ap.RawDescriptionHelpFormatter)
+    add=par.add_argument
+    add( '--env-file', '-f', type=str, default=None,
+        help="Path to the conda environment file. It will be update with current environment data (can be distable through --no-update)."
+    )
+    # give option to leave conda file alond and just test it
+    add( '--no-update', '-n', action='store_true',
+        help="If set, then do not update the conda environment file. but just test it"
+    )
+    add( '--test', '-t', action='store_true',
+        help="If set, then do not write the updated environment to file, just print it."
+    )
+    args=par.parse_args()
+    conda_env_file=args.env_file
+    test=args.test
+
+    main(MAIN_PKG, DEPENDENCIES, conda_env_file=conda_env_file, test=test, no_update=args.no_update)
