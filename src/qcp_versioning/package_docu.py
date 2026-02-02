@@ -1,4 +1,5 @@
 from .helper import VERSION_EXPECTED_FORM, VERSION_EXPECTED_FORM_READABLE
+from . import *
 
 import importlib, yaml, os
 import yaml, datetime
@@ -6,25 +7,15 @@ import re, copy
 from typing import List
 from pydantic import validate_call; val_call=validate_call(config=dict(arbitrary_types_allowed=True))
 
-from logging import getLogger, basicConfig
-logger = getLogger(__name__)
-log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+from .helper import get_version_hash
 
-basicConfig(
-    level=log_level,
-    # format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    format="%(message)s",
-)
-# warn and info
-warn= lambda msg: logger.warning(f"WARNING: {msg}")
-info= lambda msg: logger.info(f"INFO: {msg}")
-debug= lambda msg: logger.debug(f"DEBUG: {msg}")
 
 
 def make_test_name(ti:str) -> str:
-    return os.path.join(
-        os.path.dirname(ti), f"test_{os.path.basename(ti)}"
-    )
+    return f"test_{os.path.basename(ti)}"
+    #os.path.join(
+    #    os.path.dirname(ti), f"test_{os.path.basename(ti)}"
+    #)
 
 def load_version(package_name: str) -> str:
     """ Assumes that each provided package has a __version__ variable provided in e.g. a _version.py file"""
@@ -44,33 +35,7 @@ def generate_remote(git_repo:str, package_name:str, version=None):
     if not version:
         ver= 'main'
     else:
-        def process_version(version):
-            version,*meta=version.split('+')
-            import re
-            if version=='unknown':
-                warn(f"{package_name}: provided unknown version, will use the main branch")
-                return 'main'
-            else:
-                assert re.fullmatch(VERSION_EXPECTED_FORM, version), f"Cannot process version {version} of {package_name}. Expected format: {VERSION_EXPECTED_FORM_READABLE}"
-                if len(meta)<1:
-                    version=version
-                else:
-                    if len(meta)>1:
-                        raise Exception(f"Cannot process version {version}. Expected format: {VERSION_EXPECTED_FORM_READABLE} (meta is {meta})")
-                    version,*tags=meta[-1].split('.')
-                    if len(tags)>0:
-                        if len(tags)>1:
-                            raise Exception(f"Cannot process version {version}. Expected format: {VERSION_EXPECTED_FORM_READABLE} (tags are {tags})")
-                        dirty=tags[0]
-                        assert re.match(r'd.*', dirty), f"Cannot process version {version}. Expected format: {VERSION_EXPECTED_FORM_READABLE} (found dirty tag {dirty})"
-                        warn(f"{package_name}: version {version} is dirty ({dirty}), please check if you should commit something!")
-
-                # If hash comes from git, it starts with 'g' (that's what we expect since we work with git)
-                # Notably the has may be longer since git truncates in app display to 7 chars
-                assert version.startswith('g'), f"Version should come from git! Found {version} but should start with 'g'"
-                version=version[1:]
-            return version
-        ver=process_version(version)
+        ver=get_version_hash(version, package_name=package_name)
     path=f"{git_repo}/{package_name.replace('.git','')}.git"
     path += f"@{ver}"
     return path
