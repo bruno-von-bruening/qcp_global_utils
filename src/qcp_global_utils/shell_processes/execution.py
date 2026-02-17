@@ -82,10 +82,11 @@ def run_shell_command(
     @val_call
     def get_out(base_str:str, the_file:file) -> str:
         with open(the_file,'r') as rd:
-            content=rd.read()
-        content=' | '.join([base_str, content])
-        return content
-        
+            content=rd.read().rstrip('\n')
+            if len(content)==0: content=[]
+            else: content=content.split('\n')
+        return ([] if len(base_str)==0 else [base_str]) +content
+
     # Execute
     if display_command:
         print(f"# WILL RUN:\n    {cmd}")
