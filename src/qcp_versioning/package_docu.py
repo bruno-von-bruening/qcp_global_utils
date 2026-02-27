@@ -1,15 +1,24 @@
 from .helper import VERSION_EXPECTED_FORM, VERSION_EXPECTED_FORM_READABLE
 from . import *
 
-import importlib, yaml, os
-import yaml, datetime
+import importlib,  os
+import datetime
 import re, copy
 from typing import List
 from pydantic import validate_call; val_call=validate_call(config=dict(arbitrary_types_allowed=True))
 
 from .helper import get_version_hash
 
+def make_special_yaml():
+    from ruamel.yaml import YAML
+    yaml = YAML()
+    yaml.indent(mapping=2, sequence=2, offset=2)
+    yaml.sort_base_mapping_type_on_output = False
+    return yaml
 
+yaml=make_special_yaml() # Needed for indentation as in conda yaml file! (make comparison easier)
+
+# Explicitly ensure no sorting (defensive)
 
 def make_test_name(ti:str) -> str:
     return f"test_{os.path.basename(ti)}"
@@ -49,7 +58,7 @@ def dump_versions(versions):
                     f"( timestamp {time.isoformat()}({time.tzinfo}) )"
     })
     with open(version_file, 'w') as f:
-        yaml.safe_dump(versions, f)
+        yaml.dump(versions, f)
     info(f"Wrote package versions to file {version_file}")
     return version_file
 
@@ -153,7 +162,7 @@ def main(
 
             new_env_file=make_test_name(conda_env_file)
             with open(new_env_file, 'w') as wr:
-                yaml.dump(env_content, wr, sort_keys=False, indent=2) # same ordering as initial data
+                yaml.dump(env_content, wr) # same ordering as initial data
                 info(f"Wrote new environment file: {new_env_file}")
         else:
             new_env_file=conda_env_file
