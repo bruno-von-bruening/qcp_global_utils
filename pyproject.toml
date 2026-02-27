@@ -9,6 +9,9 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
 ]
+dependencies=[
+   'ruamel.yaml',
+]
 
 [tool.setuptools_scm]
 version_file = "src/qcp_global_utils/_version.py" # Make a version file (can the be used by this very package)
