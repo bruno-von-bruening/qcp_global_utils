@@ -229,7 +229,7 @@ class controller_model(BaseModel):
                 raise Exception()
             else:
                 realpath=os.path.realpath( os.path.join(directory, fi) )
-                assert os.path.isfile(realpath)
+                assert os.path.isfile(realpath), f"Not a valid file {realpath}"
                 return realpath
 
     def get_file_path(self, fi, directory=None):
@@ -326,7 +326,9 @@ class controller_model(BaseModel):
             #     if is_controller and isinstance(example,dict):
             #         example=the_type.example(**example)
             # else:
-            if is_controller: # there may be different controller types in which case we need to apply some logic
+            if key in kwargs.keys():
+                example=kwargs[key]
+            elif is_controller: # there may be different controller types in which case we need to apply some logic
 
                 # Identify possible controller types
                 the_types=get_controller_types(the_type)
@@ -354,8 +356,6 @@ class controller_model(BaseModel):
                             raise Exception(f"Could not determine controller type for field {key} in class {cls.__name__}: {the_types}\nProvided value: {kwargs[key]}\nMatched types: {matches}")
                         example=matches[0]
 
-            elif key in kwargs.keys():
-                example=kwargs[key]
             elif not is_required:
                 example =value.default
             else:
