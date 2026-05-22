@@ -86,7 +86,7 @@ def run_shell_command(
     # The output display will depend on that and maybe even get truncated (python rich)
     # COLUMNS should fix that within bashb
     if process_std:
-        cmd=f"stty cols 120; {cmd}"  # on zsh also export COLUMNS=120 would work
+        cmd=f"stty cols 120 2>/dev/null || true; {cmd}"  # on zsh also export COLUMNS=120 would work
     
     @val_call
     def get_out(base_str:str, the_file:file) -> str:

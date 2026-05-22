@@ -139,10 +139,9 @@ def export_clone_script(
         repo_url = f"https://github.com/{user}/{repo_name}.git"
     
     dir_name=f"{repo_name}_{commit}/"
-    cmd= [f"git clone {repo_url} -n {dir_name}&& git -C {dir_name} checkout {commit}"]
+    cmd= [f"git clone {repo_url} {dir_name} && git -C {dir_name} checkout {commit}"]
     if envo_name:
-        cmd[-1]+=f"&& \\ "
-        cmd+=[f"cd {dir_name} && conda env create -f install/{repo_name}_env.yaml -n {envo_name}"]
+        cmd+=[f"cd {dir_name} && conda env update -f install/{repo_name}_env.yaml -n {envo_name}"]
 
 
     lines: list[str] = [
