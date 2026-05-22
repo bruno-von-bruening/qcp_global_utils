@@ -179,8 +179,9 @@ def run_shell_command(
         ) 
         raise KeyboardInterrupt(f"Subprocess was running, and was terminated by user. Command was: '{cmd}'") from None
         
+
     if p.returncode!=0:
-        message=f"Process {p.pid} failed with code {p.returncode} (command was: \'{cmd}\')"
+        message=f"Process {p.pid} failed with code {p.returncode} (command was: \'{cmd}\'): STDOUT={stdout}\nSTDERR={stderr}"
         if not uncritical:
             raise Exception(message)
         else:
