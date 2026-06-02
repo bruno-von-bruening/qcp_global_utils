@@ -50,4 +50,4 @@ try: # rich only acts on printout so its entirely options
 
     # sys.excepthook = last_frame_traceback
 except Exception as ex: 
-    print(f"Could not install rich: {ex}")
+    print(f"NOTE: Could not load `'rich`' package (for nice printout of error tracing): {ex}")
