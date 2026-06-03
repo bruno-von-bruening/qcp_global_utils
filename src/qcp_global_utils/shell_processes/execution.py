@@ -109,8 +109,11 @@ def run_shell_command(
         stdout=sp.PIPE,
         start_new_session=True,  # replaces preexec_fn=os.setsid
     )
-    from .monitor_ressources import BackgroundProcessMonitor
     if monitor_resources:
+        try:
+            from .monitor_ressources import BackgroundProcessMonitor
+        except Exception as ex:
+            raise Exception(f"Requestd monitor ressources, but could not import. (likely) due to missing psutil package: {ex}")
         monitor=BackgroundProcessMonitor(p, refresh=resources_refresh).start()
     print(f"Started process with PID {p.pid}")
 
