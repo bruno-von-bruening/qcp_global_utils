@@ -3,7 +3,7 @@ from . import *
 from qcp_global_utils.shell_processes.execution import run_shell_command
 
 @validate_call
-def link_file(source:file, target:str|None=None, remove_old=True) -> file:
+def link_file(source:pdtc_file, target:str|None=None, remove_old=True) -> pdtc_file:
     if target is None:
         target='ln.'+os.path.basename(source)
     
@@ -27,8 +27,8 @@ class choice(str, Enum):
 class temporary_file_base(BaseModel):
     """ Source is the original file, tmp is a copy of it and which specifies which file to use
     """
-    source: file
-    tmp_file: file | None
+    source: pdtc_file
+    tmp_file: pdtc_file | None
     which:  choice = choice.tmp
     overwrite: bool=False
 
@@ -42,7 +42,8 @@ class temporary_file_base(BaseModel):
     def check(self):
         if self.tmp_file is not None:
             assert os.path.isfile(self.source), f"Source file corrupted ({self.source} is not a file): quiting for safety"
-            assert os.path.realpath(self.source)!=os.path.realpath(self.tmp_file), f"error in this class tmp_file is source file, dangerous since source could be destroyed"
+            assert os.path.realpath(self.source)!=os.path.realpath(self.tmp_file), \
+                f"error in this class tmp_file is source file ({self.source}), dangerous since source could be destroyed"
         return True
 
 class temporary_file(temporary_file_base):
@@ -71,7 +72,7 @@ class temporary_file(temporary_file_base):
             tmp_file='tmp.'+os.path.basename(tmp_file)
             run_shell_command(f"cp {os.path.realpath(old_file)} {tmp_file}")
             assert os.path.isfile(tmp_file), f"Expected but does not exist: {tmp_file} (pwd: {os.getcwd()})"
-            which=choice.tmp            
+            # which=choice.tmp            
 
         ## Unpack 
         def decompress(tmp_file, delete_old=False):
@@ -110,7 +111,8 @@ class temporary_file(temporary_file_base):
         #if tmp_file is not None:
         #    if not check_same_dir(tmp_file): raise Exception(f"Tmp file should be in present working directory ({os.getcwd()})\n{tmp_file}")
 
-        assert check_same_dir(tmp_file), f"Expected temporary file to be in pwd: {os.getcwd()} {tmp_file}"
+        if any([is_link, is_compressed, copy]):
+            assert check_same_dir(tmp_file), f"Expected temporary file to be in pwd: {os.getcwd()} {tmp_file}"
 
         the_which=choice.tmp
         return dict(
@@ -120,8 +122,9 @@ class temporary_file(temporary_file_base):
         )
 
     def remove_tmp(self, verbose=True):
-        self.check()
         if self.tmp_file is not None:
+            print(self.tmp_file)
+            self.check()
             cmd=f"rm {self.tmp_file}"
             run_shell_command(cmd)
             if verbose: print(f"Deleted temporary file {self.tmp_file}")
@@ -175,7 +178,7 @@ def load_json_or_yaml(the_file) -> Tuple[dict, list]:
     return content
 
 @val_call
-def dump_content_to_file(content, output_file:str) -> file:
+def dump_content_to_file(content, output_file:str) -> pdtc_file:
     """ Give an object to drop and the name of the outputfile
     The outputfile needs to have a recognized extension (at the moment yaml or json) to dump it automatically"""
     def extension_match(ext):
@@ -197,7 +200,7 @@ def dump_content_to_file(content, output_file:str) -> file:
     return output_file
 
 @validate_call
-def compress_file(the_file:file, compression_type:str='xz', compression_level:int|None=None) -> file:
+def compress_file(the_file:pdtc_file, compression_type:str='xz', compression_level:int|None=None) -> pdtc_file:
     """
     Compresses file with either xz or gz method
     Could also implement thread usage for xz if performance needs to be improved

@@ -37,7 +37,6 @@ def check_dump_file(string):
         raise ValueError(f"Expected dump_file to end with one of  {dump_extensions}, got {string}")
     return string
 directory=Annotated[str, BeforeValidator(check_dir)]
-file=Annotated[str, BeforeValidator(check_file)]
 pdtc_file=Annotated[str, BeforeValidator(check_file)]
 pdtc_dump_file=Annotated[str, BeforeValidator(check_dump_file)]
 pdtc_directory=Annotated[str, BeforeValidator(check_dir)]
@@ -45,7 +44,7 @@ pdtc_directory=Annotated[str, BeforeValidator(check_dir)]
 def list_to_string(the_list):
     return json.dumps(the_list)
 
-my_list=Annotated[ List[int|float|str|file], PlainSerializer(list_to_string) ]
+my_list=Annotated[ List[int|float|str|pdtc_file], PlainSerializer(list_to_string) ]
 
 class myBaseModel(BaseModel):
     """ I do not like when extra keys are just ignored (usually they hide a mismatch in key string leading to erroneous read)
