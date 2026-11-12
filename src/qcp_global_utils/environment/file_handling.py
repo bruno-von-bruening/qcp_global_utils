@@ -148,7 +148,7 @@ def is_json_file(the_file) -> bool:
     return the_file.upper().endswith( '.JSON' )
 def is_yaml_file(the_file) -> bool:
     """ Check if the file is yaml file by its ending """
-    return the_file.upper().endswith( '.YAML' )
+    return any(the_file.upper().endswith( f'.{x}') for x in ['YAML','YML'] )
 @val_call
 def is_json_or_yaml(the_file) -> bool:
     """ Check if the file is json or yaml file by its ending """

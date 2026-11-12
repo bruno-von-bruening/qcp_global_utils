@@ -46,10 +46,17 @@ def list_to_string(the_list):
 
 my_list=Annotated[ List[int|float|str|pdtc_file], PlainSerializer(list_to_string) ]
 
+from pydantic import ConfigDict
 class myBaseModel(BaseModel):
     """ I do not like when extra keys are just ignored (usually they hide a mismatch in key string leading to erroneous read)
     arbitrary_types necessary for allowing non-standard types (like np.ndarray)
     """
-    class Config:
-        arbitrary_types_allowed = True
+    model_config=ConfigDict(
+        arbitrary_types_allowed = True,
         extra = 'forbid'
+    )
+
+    if False: # old config Will be Deprecated and pushes warning 
+        class Config:
+            arbitrary_types_allowed = True
+            extra = 'forbid'
