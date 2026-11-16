@@ -1,10 +1,12 @@
 from . import *
 import time, re
 
+from qcp_global_utils.pydantic.pydantic import myBaseModel
+
 def now():
     return time.time()
 
-class time_point(BaseModel):
+class time_point(myBaseModel):
     """ Captures the timing of a single event (between two different markers)"""
     key:        str
     time:       float
@@ -13,7 +15,7 @@ class time_point(BaseModel):
         if time is None:
             time=now()
         super().__init__(key=key, time=time)
-class period(BaseModel):
+class period(myBaseModel):
     start_key: str
     end_key: str
     time_start: float
@@ -27,7 +29,7 @@ class period(BaseModel):
             'duration':self.time_end-self.time_start
         }
 
-class Tracker_data(BaseModel):
+class Tracker_data(myBaseModel):
     messages    : my_list=[]
     warnings    : my_list=[]
     errors      : my_list=[]

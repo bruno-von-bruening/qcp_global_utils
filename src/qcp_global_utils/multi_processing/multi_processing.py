@@ -1,8 +1,9 @@
 from . import *
 import multiprocessing as mp
 
+from qcp_global_utils.pydantic.pydantic import myBaseModel
 
-class job(BaseModel):
+class job(myBaseModel):
     function: Callable
     args: List = []
     kwargs: dict ={}

@@ -53,7 +53,8 @@ class myBaseModel(BaseModel):
     """
     model_config=ConfigDict(
         arbitrary_types_allowed = True,
-        extra = 'forbid'
+        extra = 'forbid',
+        use_enum_values=True,
     )
 
     if False: # old config Will be Deprecated and pushes warning 

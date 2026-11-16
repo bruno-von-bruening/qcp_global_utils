@@ -3,6 +3,7 @@ import copy
 
 from typing import Annotated, Literal, Tuple
 from  pydantic import AfterValidator
+from qcp_global_utils.pydantic.pydantic import myBaseModel
 
 from qcp_global_utils.environment.environment_variables import get_environment_var
 import logging
@@ -141,11 +142,7 @@ def process_input(*args,**kwargs):
 
     return args, kwargs
 
-class controller_model(BaseModel):
-    class Config:
-        arbitrary_types_allowed=True
-        use_enum_values=True
-        extra='forbid'
+class controller_model(myBaseModel):
     directory: str|None =Field(default=None, exclude=True)
     filename: str|None =Field(default=None, exclude=True)# To remember file location to make relative paths work correctly
     __example_values__={}
@@ -196,7 +193,7 @@ class controller_model(BaseModel):
         save_kwargs=copy.deepcopy(kwargs)
 
 
-        for key, value in self.__fields__.items():
+        for key, value in type(self).model_fields.items():
             the_type=value.annotation
             is_controler = check_is_controller(the_type)
 
@@ -255,7 +252,7 @@ class controller_model(BaseModel):
     #    # Make a dictionary of this class
 
     #    raise Exception()
-    #    for key, value in cls.__fields__.items():
+    #    for key, value in cls.model_fields.items():
     #        if key in example_kwargs.keys():
     #            pass
     #        else:
@@ -298,7 +295,7 @@ class controller_model(BaseModel):
         example_kwargs=copy.deepcopy(cls.__example_values__)
 
         # Assert that example args are define fields
-        defined_keys=list(cls.__fields__.keys())
+        defined_keys=list(cls.model_fields.keys())
         for k,v in example_kwargs.items():
             assert k in defined_keys, f"Example key {k} not in defined keys {defined_keys}"
         for k,v in kwargs.items():
@@ -307,7 +304,7 @@ class controller_model(BaseModel):
 
         # Make a dictionary of this class
         new_kwargs={}
-        for key, value in cls.__fields__.items():
+        for key, value in cls.model_fields.items():
             if exclude:
                 if key in exclude:
                     continue
@@ -378,7 +375,7 @@ class controller_model(BaseModel):
         base_kwargs=cls.example()
         defaults=cls.__default_values__
 
-        fields=cls.__fields__
+        fields=cls.model_fields
 
         # CHECK
         undefined=[ k for k in kwargs.keys() if k not in fields.keys() ]

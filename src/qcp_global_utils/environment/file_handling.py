@@ -1,6 +1,7 @@
 from . import *
 
 from qcp_global_utils.shell_processes.execution import run_shell_command
+from qcp_global_utils.pydantic.pydantic import myBaseModel
 
 @validate_call
 def link_file(source:pdtc_file, target:str|None=None, remove_old=True) -> pdtc_file:
@@ -24,7 +25,7 @@ def link_file(source:pdtc_file, target:str|None=None, remove_old=True) -> pdtc_f
 class choice(str, Enum):
     tmp = 'temporary'
     src = 'source'
-class temporary_file_base(BaseModel):
+class temporary_file_base(myBaseModel):
     """ Source is the original file, tmp is a copy of it and which specifies which file to use
     """
     source: pdtc_file

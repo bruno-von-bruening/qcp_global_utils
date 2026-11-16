@@ -1,6 +1,8 @@
 from qcp_global_utils.util.import_helper import *
 import re
 
+from qcp_global_utils.pydantic.pydantic import myBaseModel
+
 from . import *
 VERSION_EXPECTED_FORM_READABLE='[v]X.Y.Z[+<commit_hash>][.d<dirtyinfo>]'
 # Why does this not match 0.1.1.dev23+g50eb2b584.d20260127?
@@ -52,7 +54,7 @@ def get_version_hash(version_tag:str, package_name:str|None=None) -> str:
 def check_version(version_tag):
     assert re.fullmatch(VERSION_EXPECTED_FORM, version_tag), f"Cannot process version {version_tag} of package {package_name}. Expected format: {VERSION_EXPECTED_FORM_READABLE}"
 
-class Version(BaseModel):
+class Version(myBaseModel):
     major: int
     minor: int
     patch: int|None=None # could be dev[i]
